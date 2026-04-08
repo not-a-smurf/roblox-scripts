@@ -1,5 +1,6 @@
 local games = {
-    [18326509492] = "killstreak", -- replace with actual PlaceId
+    [18326509492] = "killstreak",
+    [130223052405478]   = "fishpond",
 }
 
 local baseUrl = "https://raw.githubusercontent.com/not-a-smurf/roblox-scripts/main/games/"
