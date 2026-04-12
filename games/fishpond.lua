@@ -18,6 +18,7 @@ local collectedIds     = {}
 local espEnabled       = false
 local expSpeedEnabled  = false
 local expFogEnabled    = false
+local autoFishEnabled  = false
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -153,7 +154,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 390
+local W, H = 220, 430
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "EggCollector"
@@ -520,7 +521,11 @@ makeToggle(340, "Clear Fog (auto on dive)", function(active)
     end
 end)
 
-makeSlider(368, "Exp spd", 1, 500, 80, 80, function(v)
+makeToggle(370, "Auto Fish / Harpoon", function(active)
+    autoFishEnabled = active
+end)
+
+makeSlider(398, "Exp spd", 1, 500, 80, 80, function(v)
     EXP_SPEED = v
     local hum = getHumanoid()
     if hum and IN_EXPEDITION and expSpeedEnabled then
@@ -719,6 +724,49 @@ local function collectAll()
     end
 end
 
+
+-- ── Auto Fish / Harpoon ───────────────────────────────────────────────────────
+-- Watches HitTheZoneCircleUI > Holder > Main > Arrow and Target
+-- When Arrow.Rotation is within Target arc, fires mouse1click()
+
+local function getMinigameElements()
+    local pg = player.PlayerGui
+    local gui = pg:FindFirstChild("HitTheZoneCircleUI")
+    if not gui then return nil end
+    local holder = gui:FindFirstChild("Holder")
+    if not holder then return nil end
+    local main = holder:FindFirstChild("Main")
+    if not main then return nil end
+    return main:FindFirstChild("Arrow"), main:FindFirstChild("Target"), holder
+end
+
+-- Normalize angle to 0-360
+local function normAngle(a)
+    return ((a % 360) + 360) % 360
+end
+
+-- Check if angle is within an arc centered at targetRot with given width
+local function inArc(arrowRot, targetRot, arcWidth)
+    local diff = normAngle(arrowRot - targetRot + 180) - 180
+    return math.abs(diff) <= arcWidth / 2
+end
+
+local lastClick = 0
+RunService.Heartbeat:Connect(function()
+    if not autoFishEnabled then return end
+    local arrow, target, holder = getMinigameElements()
+    if not arrow or not target or not holder then return end
+    if not holder.Visible then return end
+
+    -- Click when Arrow is within ~10 degrees of Target center (always hits middle of blue zone)
+    if inArc(arrow.Rotation, target.Rotation, 10) then
+        local now = tick()
+        if (now - lastClick) > 0.15 then
+            lastClick = now
+            mouse1click()
+        end
+    end
+end)
 -- ── Main loop ─────────────────────────────────────────────────────────────────
 while true do
     if running then
@@ -728,3 +776,4 @@ while true do
         task.wait(0.1)
     end
 end
+
