@@ -8,14 +8,19 @@ local activeEggs = workspace:WaitForChild("EasterEggHuntRuntime"):WaitForChild("
 local COLLECT_DELAY = 0.1
 local LOOP_DELAY    = 1
 
-local running       = false
-local flyEnabled    = false
-local noclipEnabled = false
-local flySpeed      = 1
-local walkSpeed     = 16
-local jumpPower     = 50
-local collectedIds  = {}
-local espEnabled    = false
+local running          = false
+local flyEnabled       = false
+local noclipEnabled    = false
+local flySpeed         = 1
+local walkSpeed        = 16
+local jumpPower        = 50
+local collectedIds     = {}
+local espEnabled       = false
+local expSpeedEnabled  = false
+local expFogEnabled    = false
+local EXP_SPEED        = 80
+local IN_EXPEDITION    = false
+local lastFogClear     = 0
 
 local function getHumanoid()
     local char = player.Character
@@ -95,6 +100,49 @@ local function disableFly()
     if hum then hum.PlatformStand = false end
 end
 
+-- ── Expedition helpers ────────────────────────────────────────────────────────
+local function isInExpedition()
+    local char = player.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    return hrp.Position.Y < 1000
+end
+
+local function clearFog()
+    for _, obj in ipairs(game:GetService("Lighting"):GetDescendants()) do
+        if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+            obj.Enabled = false
+        end
+    end
+    local atmo = workspace:FindFirstChildOfClass("Atmosphere")
+    if atmo then
+        atmo.Density = 0
+        atmo.Haze    = 0
+        atmo.Glare   = 0
+    end
+    game:GetService("Lighting").FogEnd   = 100000
+    game:GetService("Lighting").FogStart = 100000
+    local expedition = workspace:FindFirstChild("Expedition")
+    if expedition then
+        for _, obj in ipairs(expedition:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name:lower():find("fog") or obj.Name:lower():find("murk")) then
+                obj.Transparency = 1
+            end
+        end
+    end
+end
+
+local function restoreFog()
+    for _, obj in ipairs(game:GetService("Lighting"):GetDescendants()) do
+        if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+            obj.Enabled = true
+        end
+    end
+    game:GetService("Lighting").FogEnd   = 1000
+    game:GetService("Lighting").FogStart = 0
+end
+
 player.CharacterAdded:Connect(function(char)
     task.wait(1)
     local hum = char:WaitForChild("Humanoid")
@@ -105,7 +153,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 295
+local W, H = 220, 390
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "EggCollector"
@@ -139,7 +187,7 @@ titlePatch.Parent           = titleBar
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size                   = UDim2.new(1, -36, 1, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text                   = "Egg Collector"
+titleLabel.Text                   = "Fish Pond"
 titleLabel.TextColor3             = Color3.fromRGB(220, 220, 220)
 titleLabel.TextSize               = 13
 titleLabel.Font                   = Enum.Font.GothamBold
@@ -156,7 +204,7 @@ Instance.new("UICorner", closeBg).CornerRadius = UDim.new(0, 4)
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size                   = UDim2.new(1, 0, 1, 0)
 closeBtn.BackgroundTransparency = 1
-closeBtn.Text                   = "✕"
+closeBtn.Text                   = "X"
 closeBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
 closeBtn.TextSize               = 12
 closeBtn.Font                   = Enum.Font.GothamBold
@@ -168,6 +216,7 @@ closeBtn.MouseButton1Click:Connect(function()
     running = false
     disableFly()
     disableNoclip()
+    if expFogEnabled then restoreFog() end
     screenGui:Destroy()
 end)
 
@@ -198,7 +247,7 @@ startBtn.Size             = UDim2.new(1, -12, 0, 26)
 startBtn.Position         = UDim2.new(0, 6, 0, 55)
 startBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
 startBtn.BorderSizePixel  = 0
-startBtn.Text             = "Start"
+startBtn.Text             = "Start Egg Collector"
 startBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
 startBtn.TextSize         = 13
 startBtn.Font             = Enum.Font.GothamBold
@@ -208,10 +257,10 @@ Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0, 6)
 startBtn.MouseButton1Click:Connect(function()
     running = not running
     if running then
-        startBtn.Text             = "Stop"
+        startBtn.Text             = "Stop Egg Collector"
         startBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
     else
-        startBtn.Text             = "Start"
+        startBtn.Text             = "Start Egg Collector"
         startBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
         statusLabel.Text          = "Status: Idle"
         statusLabel.TextColor3    = Color3.fromRGB(160, 160, 160)
@@ -294,6 +343,7 @@ makeToggle(148, "Fly  (WASD + Space/Shift)", function(active)
     if active then enableFly() else disableFly() end
 end)
 
+-- ── Divider: Movement ─────────────────────────────────────────────────────────
 local div2 = Instance.new("Frame")
 div2.Size             = UDim2.new(1, -12, 0, 1)
 div2.Position         = UDim2.new(0, 6, 0, 178)
@@ -432,6 +482,52 @@ makeSlider(258, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, functio
     if hum then hum.JumpPower = v end
 end)
 
+-- ── Divider: Expedition ───────────────────────────────────────────────────────
+local div3 = Instance.new("Frame")
+div3.Size             = UDim2.new(1, -12, 0, 1)
+div3.Position         = UDim2.new(0, 6, 0, 288)
+div3.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+div3.BorderSizePixel  = 0
+div3.Parent           = frame
+
+local expLbl = Instance.new("TextLabel")
+expLbl.Size                   = UDim2.new(1, -12, 0, 14)
+expLbl.Position               = UDim2.new(0, 6, 0, 292)
+expLbl.BackgroundTransparency = 1
+expLbl.Text                   = "EXPEDITION"
+expLbl.TextColor3             = Color3.fromRGB(90, 90, 90)
+expLbl.TextSize               = 10
+expLbl.Font                   = Enum.Font.GothamBold
+expLbl.TextXAlignment         = Enum.TextXAlignment.Left
+expLbl.Parent                 = frame
+
+makeToggle(310, "Speed Boost (auto on dive)", function(active)
+    expSpeedEnabled = active
+    if not active then
+        local hum = getHumanoid()
+        if hum and IN_EXPEDITION then
+            hum.WalkSpeed = walkSpeed
+        end
+    end
+end)
+
+makeToggle(340, "Clear Fog (auto on dive)", function(active)
+    expFogEnabled = active
+    if active and IN_EXPEDITION then
+        clearFog()
+    elseif not active then
+        restoreFog()
+    end
+end)
+
+makeSlider(368, "Exp spd", 1, 500, 80, 80, function(v)
+    EXP_SPEED = v
+    local hum = getHumanoid()
+    if hum and IN_EXPEDITION and expSpeedEnabled then
+        hum.WalkSpeed = v
+    end
+end)
+
 -- ── Dragging ──────────────────────────────────────────────────────────────────
 local dragging, dragStart, startPos
 
@@ -516,7 +612,7 @@ local function updateEsp()
         local txt = Instance.new("TextLabel")
         txt.Size                   = UDim2.new(1, 0, 1, 0)
         txt.BackgroundTransparency = 1
-        txt.Text                   = egg.Name .. (isCollected and " ✓" or "")
+        txt.Text                   = egg.Name
         txt.TextColor3             = color
         txt.TextSize               = 12
         txt.Font                   = Enum.Font.GothamBold
@@ -530,6 +626,43 @@ task.spawn(function()
     while true do
         updateEsp()
         task.wait(0.5)
+    end
+end)
+
+-- ── Expedition watcher ────────────────────────────────────────────────────────
+RunService.Heartbeat:Connect(function()
+    local inExp = isInExpedition()
+
+    if inExp and not IN_EXPEDITION then
+        IN_EXPEDITION = true
+        if expSpeedEnabled then
+            local hum = getHumanoid()
+            if hum then hum.WalkSpeed = EXP_SPEED end
+        end
+        if expFogEnabled then clearFog() end
+
+    elseif not inExp and IN_EXPEDITION then
+        IN_EXPEDITION = false
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = walkSpeed end
+        if expFogEnabled then restoreFog() end
+    end
+
+    -- Keep speed set and fog clear while inside
+    if IN_EXPEDITION then
+        if expSpeedEnabled then
+            local hum = getHumanoid()
+            if hum and hum.WalkSpeed ~= EXP_SPEED then
+                hum.WalkSpeed = EXP_SPEED
+            end
+        end
+        if expFogEnabled then
+            local now = tick()
+            if (now - lastFogClear) > 5 then
+                clearFog()
+                lastFogClear = now
+            end
+        end
     end
 end)
 
