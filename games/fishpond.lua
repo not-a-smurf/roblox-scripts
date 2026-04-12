@@ -19,6 +19,9 @@ local espEnabled       = false
 local expSpeedEnabled  = false
 local expFogEnabled    = false
 local autoFishEnabled  = false
+local autoSurfaceEnabled = false
+local SURFACE_HP_PCT    = 0.30  -- surface when HP drops below 30%
+local EXPEDITION_BACK   = Vector3.new(-265, 62, -4.8)
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -154,7 +157,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 430
+local W, H = 220, 500
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "EggCollector"
@@ -525,7 +528,38 @@ makeToggle(370, "Auto Fish / Harpoon", function(active)
     autoFishEnabled = active
 end)
 
-makeSlider(398, "Exp spd", 1, 500, 80, 80, function(v)
+-- Surface now button
+local surfBtnBg = Instance.new("Frame")
+surfBtnBg.Size             = UDim2.new(1, -12, 0, 26)
+surfBtnBg.Position         = UDim2.new(0, 6, 0, 400)
+surfBtnBg.BackgroundColor3 = Color3.fromRGB(40, 100, 180)
+surfBtnBg.BorderSizePixel  = 0
+surfBtnBg.Parent           = frame
+Instance.new("UICorner", surfBtnBg).CornerRadius = UDim.new(0, 6)
+
+local surfBtn = Instance.new("TextButton")
+surfBtn.Size                   = UDim2.new(1, 0, 1, 0)
+surfBtn.BackgroundTransparency = 1
+surfBtn.Text                   = "Surface Now"
+surfBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+surfBtn.TextSize               = 12
+surfBtn.Font                   = Enum.Font.GothamBold
+surfBtn.Parent                 = surfBtnBg
+
+surfBtnBg.MouseEnter:Connect(function() surfBtnBg.BackgroundColor3 = Color3.fromRGB(60, 130, 220) end)
+surfBtnBg.MouseLeave:Connect(function() surfBtnBg.BackgroundColor3 = Color3.fromRGB(40, 100, 180) end)
+surfBtn.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = CFrame.new(EXPEDITION_BACK + Vector3.new(0, 4, 0)) end
+end)
+
+makeToggle(430, "Auto Surface at 30% HP", function(active)
+    autoSurfaceEnabled = active
+end)
+
+makeSlider(460, "Exp spd", 1, 500, 80, 80, function(v)
     EXP_SPEED = v
     local hum = getHumanoid()
     if hum and IN_EXPEDITION and expSpeedEnabled then
@@ -651,6 +685,18 @@ RunService.Heartbeat:Connect(function()
         local hum = getHumanoid()
         if hum then hum.WalkSpeed = walkSpeed end
         if expFogEnabled then restoreFog() end
+    end
+
+    -- Auto surface on low HP
+    if IN_EXPEDITION and autoSurfaceEnabled then
+        local char = player.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.MaxHealth > 0 and (hum.Health / hum.MaxHealth) <= SURFACE_HP_PCT then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(EXPEDITION_BACK + Vector3.new(0, 4, 0))
+            end
+        end
     end
 
     -- Keep speed set and fog clear while inside
