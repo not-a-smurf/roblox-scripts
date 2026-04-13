@@ -59,7 +59,7 @@ end
 
 local function isVastoLorde(model)
     local name = model.Name:lower()
-    return name:find("vastolorde") or name:find("vastocar") or name:find("vastohallow")
+    return name:find("vastolorde") or name:find("vastocar") or name:find("vastohollow")
 end
 
 local function isEggNPC(model)
