@@ -850,9 +850,12 @@ local lastArrowRot = nil
 local wasInZone    = false
 
 -- ARC_HALF: half the blue zone width in degrees
--- Set wider so we click at entry not center
--- Typical blue zone is 40-90 degrees wide so half is 20-45
 local ARC_HALF = 35
+
+-- CLICK_OFFSET: how many degrees before the zone edge to fire the click
+-- Compensates for the small delay between detection and mouse1click() executing
+-- Positive = click earlier (before entry), negative = click later (inside zone)
+local CLICK_OFFSET = -2
 
 RunService.Heartbeat:Connect(function()
     if not autoFishEnabled then return end
@@ -876,7 +879,9 @@ RunService.Heartbeat:Connect(function()
     end
     lastArrowRot = arrowRot
 
-    local diff = normAngle(arrowRot - targetRot + 180) - 180
+    -- Apply offset in the direction of spin so we click slightly ahead of entry
+    local adjustedArrow = arrowRot + (spinDir * CLICK_OFFSET)
+    local diff = normAngle(adjustedArrow - targetRot + 180) - 180
     local inZone = math.abs(diff) <= ARC_HALF
 
     -- Click on the moment we enter the zone (transition from outside to inside)
@@ -900,5 +905,7 @@ while true do
         task.wait(0.1)
     end
 end
+
+
 
 
