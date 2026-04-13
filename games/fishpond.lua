@@ -21,7 +21,7 @@ local expFogEnabled    = false
 local autoFishEnabled  = false
 local autoSurfaceEnabled = false
 local SURFACE_HP_PCT    = 0.30  -- surface when HP drops below 30%
-local EXPEDITION_BACK   = Vector3.new(-265, 62, -4.8)
+local EXPEDITION_BACK   = Vector3.new(-60108, 2295, -24.4)  -- top of expedition shaft
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -110,15 +110,41 @@ local function isInExpedition()
     if not char then return false end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
-    return hrp.Position.Y < 1000
+    -- Expedition zone is at around X=-60108, normal world is around X=-265
+    return hrp.Position.X < -1000
+end
+
+local fogConnections = {}
+
+local function hookFogObject(obj)
+    if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+        obj.Enabled = false
+        local conn = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
+            if expFogEnabled and obj.Enabled then
+                obj.Enabled = false
+            end
+        end)
+        table.insert(fogConnections, conn)
+    end
 end
 
 local function clearFog()
+    -- Disconnect old hooks
+    for _, c in ipairs(fogConnections) do pcall(function() c:Disconnect() end) end
+    fogConnections = {}
+
+    -- Hook all existing effects
     for _, obj in ipairs(game:GetService("Lighting"):GetDescendants()) do
-        if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
-            obj.Enabled = false
-        end
+        hookFogObject(obj)
     end
+
+    -- Hook new effects as they get added
+    local conn = game:GetService("Lighting").DescendantAdded:Connect(function(obj)
+        if expFogEnabled then hookFogObject(obj) end
+    end)
+    table.insert(fogConnections, conn)
+
+    -- Clear atmosphere and fog distance
     local atmo = workspace:FindFirstChildOfClass("Atmosphere")
     if atmo then
         atmo.Density = 0
@@ -127,17 +153,11 @@ local function clearFog()
     end
     game:GetService("Lighting").FogEnd   = 100000
     game:GetService("Lighting").FogStart = 100000
-    local expedition = workspace:FindFirstChild("Expedition")
-    if expedition then
-        for _, obj in ipairs(expedition:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name:lower():find("fog") or obj.Name:lower():find("murk")) then
-                obj.Transparency = 1
-            end
-        end
-    end
 end
 
 local function restoreFog()
+    for _, c in ipairs(fogConnections) do pcall(function() c:Disconnect() end) end
+    fogConnections = {}
     for _, obj in ipairs(game:GetService("Lighting"):GetDescendants()) do
         if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
             obj.Enabled = true
@@ -707,13 +727,7 @@ RunService.Heartbeat:Connect(function()
                 hum.WalkSpeed = EXP_SPEED
             end
         end
-        if expFogEnabled then
-            local now = tick()
-            if (now - lastFogClear) > 5 then
-                clearFog()
-                lastFogClear = now
-            end
-        end
+        -- fog is handled by hooks, no polling needed
     end
 end)
 
