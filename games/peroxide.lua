@@ -53,11 +53,13 @@ local function getNPCType(model)
         return "adjuchas"
     elseif name:find("normalhallow") or name:find("normalhollow") then
         return "hollow"
-    elseif model:FindFirstChild("Head") then
-        -- Fallback: check head for egg regardless of name
-        return "hollow"
     end
     return "hollow"
+end
+
+local function isVastoLorde(model)
+    local name = model.Name:lower()
+    return name:find("vastolorde") or name:find("vastocar") or name:find("vastohallow")
 end
 
 local function isEggNPC(model)
@@ -126,12 +128,17 @@ local function tryAddNPC(model)
         if p.Character == model then isPlayer = true break end
     end
     if isPlayer then return end
-    if not isEggNPC(model) then return end
+
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
+    local hasEgg = isEggNPC(model)
+    local isVasto = isVastoLorde(model)
+
+    -- Only track if it has an egg OR is a vasto lorde (even without egg)
+    if not hasEgg and not isVasto then return end
+
     local npcType = getNPCType(model)
-    -- Map npc subtype to esp type string
     local espType = "npc_hollow"
     if npcType == "adjuchas" then
         espType = "npc_adjuchas"
@@ -139,11 +146,15 @@ local function tryAddNPC(model)
         espType = "npc_vasto"
     end
 
+    -- Display name: egg name if it has one, otherwise the model's actual name
+    local displayName = hasEgg and getEggName(model) or "Vasto Lorde"
+
     addEntry({
-        type = espType,
-        name = getEggName(model),
-        part = hrp,
-        hum  = model:FindFirstChildOfClass("Humanoid"),
+        type      = espType,
+        name      = displayName,
+        modelName = model.Name,  -- always send full model name for name toggle
+        part      = hrp,
+        hum       = model:FindFirstChildOfClass("Humanoid"),
     })
     track(model.AncestryChanged:Connect(function(_, parent)
         if not parent then removeByPart(hrp) end
@@ -253,19 +264,18 @@ track(RunService.Heartbeat:Connect(function()
                 name = getMoneyAmount(part)
             end
             table.insert(npcs, {
-                type    = entry.type,
-                name    = name,
-                sx      = math.floor(sp.X),
-                sy      = math.floor(sp.Y),
-                dist    = math.floor(dist),
-                visible = vis,
-                hp      = hp,
-                maxhp   = maxhp,
+                type      = entry.type,
+                name      = name,
+                modelName = entry.modelName or "",
+                sx        = math.floor(sp.X),
+                sy        = math.floor(sp.Y),
+                dist      = math.floor(dist),
+                visible   = vis,
+                hp        = hp,
+                maxhp     = maxhp,
             })
         end
     end
 
     sendData(HttpService:JSONEncode({ npcs = npcs }))
 end))
-
-
