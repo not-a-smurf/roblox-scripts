@@ -688,22 +688,40 @@ task.spawn(function()
     end
 end)
 
+-- ── Expedition movement boost ───────────────────────────────────────────────
+local expBodyVel = nil
+
+local function enableExpSpeed()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if expBodyVel then expBodyVel:Destroy() end
+    expBodyVel          = Instance.new("BodyVelocity")
+    expBodyVel.Velocity = Vector3.zero
+    expBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    expBodyVel.Parent   = hrp
+end
+
+local function disableExpSpeed()
+    if expBodyVel then
+        expBodyVel:Destroy()
+        expBodyVel = nil
+    end
+end
+
 -- ── Expedition watcher ────────────────────────────────────────────────────────
 RunService.Heartbeat:Connect(function()
     local inExp = isInExpedition()
 
     if inExp and not IN_EXPEDITION then
         IN_EXPEDITION = true
-        if expSpeedEnabled then
-            local hum = getHumanoid()
-            if hum then hum.WalkSpeed = EXP_SPEED end
-        end
-        if expFogEnabled then clearFog() end
+        if expSpeedEnabled then enableExpSpeed() end
+        if expFogEnabled   then clearFog()       end
 
     elseif not inExp and IN_EXPEDITION then
         IN_EXPEDITION = false
-        local hum = getHumanoid()
-        if hum then hum.WalkSpeed = walkSpeed end
+        disableExpSpeed()
         if expFogEnabled then restoreFog() end
     end
 
@@ -719,15 +737,31 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Keep speed set and fog clear while inside
-    if IN_EXPEDITION then
-        if expSpeedEnabled then
-            local hum = getHumanoid()
-            if hum and hum.WalkSpeed ~= EXP_SPEED then
-                hum.WalkSpeed = EXP_SPEED
-            end
-        end
-        -- fog is handled by hooks, no polling needed
+    -- Update expedition speed boost direction
+    if IN_EXPEDITION and expSpeedEnabled and expBodyVel and expBodyVel.Parent then
+        local cam = workspace.CurrentCamera
+        local dir = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W)         then dir += cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S)         then dir -= cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A)         then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D)         then dir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space)     then dir += Vector3.new(0,1,0)     end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0)     end
+        if dir.Magnitude > 0 then dir = dir.Unit end
+        expBodyVel.Velocity = dir * EXP_SPEED
+    elseif expBodyVel and expBodyVel.Parent then
+        expBodyVel.Velocity = Vector3.zero
+    end
+
+    -- fog is handled by hooks, no polling needed
+end)
+
+-- Clean up exp speed on character respawn
+player.CharacterAdded:Connect(function()
+    expBodyVel = nil
+    if IN_EXPEDITION and expSpeedEnabled then
+        task.wait(1)
+        enableExpSpeed()
     end
 end)
 
@@ -811,20 +845,50 @@ local function inArc(arrowRot, targetRot, arcWidth)
     return math.abs(diff) <= arcWidth / 2
 end
 
-local lastClick = 0
+local lastClick    = 0
+local lastArrowRot = nil
+local wasInZone    = false
+
+-- ARC_HALF: half the blue zone width in degrees
+-- Set wider so we click at entry not center
+-- Typical blue zone is 40-90 degrees wide so half is 20-45
+local ARC_HALF = 35
+
 RunService.Heartbeat:Connect(function()
     if not autoFishEnabled then return end
     local arrow, target, holder = getMinigameElements()
     if not arrow or not target or not holder then return end
-    if not holder.Visible then return end
+    if not holder.Visible then
+        lastArrowRot = nil
+        wasInZone    = false
+        return
+    end
 
-    -- Click when Arrow is within ~10 degrees of Target center (always hits middle of blue zone)
-    if inArc(arrow.Rotation, target.Rotation, 10) then
+    local arrowRot  = arrow.Rotation
+    local targetRot = target.Rotation
+
+    -- Detect entry into zone using leading edge
+    -- Figure out spin direction
+    local spinDir = 0
+    if lastArrowRot then
+        local delta = normAngle(arrowRot - lastArrowRot + 180) - 180
+        if delta > 0 then spinDir = 1 elseif delta < 0 then spinDir = -1 end
+    end
+    lastArrowRot = arrowRot
+
+    local diff = normAngle(arrowRot - targetRot + 180) - 180
+    local inZone = math.abs(diff) <= ARC_HALF
+
+    -- Click on the moment we enter the zone (transition from outside to inside)
+    if inZone and not wasInZone then
         local now = tick()
-        if (now - lastClick) > 0.15 then
+        if (now - lastClick) > 0.2 then
             lastClick = now
             mouse1click()
+            wasInZone = false  -- reset immediately so next spawn is detected right away
         end
+    else
+        wasInZone = inZone
     end
 end)
 -- ── Main loop ─────────────────────────────────────────────────────────────────
