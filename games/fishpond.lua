@@ -855,7 +855,7 @@ local ARC_HALF = 35
 -- CLICK_OFFSET: how many degrees before the zone edge to fire the click
 -- Compensates for the small delay between detection and mouse1click() executing
 -- Positive = click earlier (before entry), negative = click later (inside zone)
-local CLICK_OFFSET = -2
+local CLICK_OFFSET = -4
 
 RunService.Heartbeat:Connect(function()
     if not autoFishEnabled then return end
@@ -905,6 +905,7 @@ while true do
         task.wait(0.1)
     end
 end
+
 
 
 
