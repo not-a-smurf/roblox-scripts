@@ -855,7 +855,7 @@ local ARC_HALF = 35
 -- CLICK_OFFSET: how many degrees before the zone edge to fire the click
 -- Compensates for the small delay between detection and mouse1click() executing
 -- Positive = click earlier (before entry), negative = click later (inside zone)
-local CLICK_OFFSET = -4
+local CLICK_DELAY_SECONDS = 0.02  -- fire 20ms after entering zone, works same regardless of arrow speed
 
 RunService.Heartbeat:Connect(function()
     if not autoFishEnabled then return end
@@ -879,18 +879,18 @@ RunService.Heartbeat:Connect(function()
     end
     lastArrowRot = arrowRot
 
-    -- Apply offset in the direction of spin so we click slightly ahead of entry
-    local adjustedArrow = arrowRot + (spinDir * CLICK_OFFSET)
-    local diff = normAngle(adjustedArrow - targetRot + 180) - 180
+        local diff = normAngle(arrowRot - targetRot + 180) - 180
     local inZone = math.abs(diff) <= ARC_HALF
 
-    -- Click on the moment we enter the zone (transition from outside to inside)
+    -- On zone entry, wait CLICK_DELAY_SECONDS then fire - consistent regardless of arrow speed
     if inZone and not wasInZone then
         local now = tick()
         if (now - lastClick) > 0.2 then
-            lastClick = now
-            mouse1click()
-            wasInZone = false  -- reset immediately so next spawn is detected right away
+            wasInZone = false
+            task.delay(CLICK_DELAY_SECONDS, function()
+                lastClick = tick()
+                mouse1click()
+            end)
         end
     else
         wasInZone = inZone
