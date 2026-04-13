@@ -21,7 +21,7 @@ local expFogEnabled    = false
 local autoFishEnabled  = false
 local autoSurfaceEnabled = false
 local SURFACE_HP_PCT    = 0.50  -- surface when HP drops below 50%
-local EXPEDITION_BACK   = Vector3.new(-265, 68, -4.8)  -- surface side, next to diving bell
+local EXPEDITION_BACK   = Vector3.new(-60108, 2320, -24.4)  -- top of expedition shaft, above rocks
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -267,14 +267,14 @@ countLabel.TextXAlignment         = Enum.TextXAlignment.Right
 countLabel.Parent                 = frame
 
 local coordsLabel = Instance.new("TextLabel")
-coordsLabel.Size                   = UDim2.new(1, -12, 0, 16)
-coordsLabel.Position               = UDim2.new(0, 6, 0, 52)
+coordsLabel.Size                   = UDim2.new(0.5, -6, 0, 20)
+coordsLabel.Position               = UDim2.new(0.5, 0, 0, 32)
 coordsLabel.BackgroundTransparency = 1
-coordsLabel.Text                   = "X: 0  Y: 0  Z: 0"
+coordsLabel.Text                   = "0  0  0"
 coordsLabel.TextColor3             = Color3.fromRGB(80, 80, 80)
 coordsLabel.TextSize               = 10
 coordsLabel.Font                   = Enum.Font.Gotham
-coordsLabel.TextXAlignment         = Enum.TextXAlignment.Left
+coordsLabel.TextXAlignment         = Enum.TextXAlignment.Right
 coordsLabel.Parent                 = frame
 
 local startBtn = Instance.new("TextButton")
@@ -771,7 +771,7 @@ RunService.Heartbeat:Connect(function()
     local hrp2  = char2 and char2:FindFirstChild("HumanoidRootPart")
     if hrp2 then
         local p = hrp2.Position
-        coordsLabel.Text = string.format("X:%.0f Y:%.0f Z:%.0f", p.X, p.Y, p.Z)
+        coordsLabel.Text = string.format("%.0f  %.0f  %.0f", p.X, p.Y, p.Z)
     end
 end)
 
