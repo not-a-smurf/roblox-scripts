@@ -21,7 +21,7 @@ local expFogEnabled    = false
 local autoFishEnabled  = false
 local autoSurfaceEnabled = false
 local SURFACE_HP_PCT    = 0.50  -- surface when HP drops below 50%
-local EXPEDITION_BACK   = Vector3.new(-60108.7, 2384, 33.5)  -- hole layer exit (exact)
+local EXPEDITION_BACK   = Vector3.new(-265, 68, -4.8)  -- surface side, next to diving bell
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -266,9 +266,20 @@ countLabel.Font                   = Enum.Font.GothamBold
 countLabel.TextXAlignment         = Enum.TextXAlignment.Right
 countLabel.Parent                 = frame
 
+local coordsLabel = Instance.new("TextLabel")
+coordsLabel.Size                   = UDim2.new(1, -12, 0, 16)
+coordsLabel.Position               = UDim2.new(0, 6, 0, 52)
+coordsLabel.BackgroundTransparency = 1
+coordsLabel.Text                   = "X: 0  Y: 0  Z: 0"
+coordsLabel.TextColor3             = Color3.fromRGB(80, 80, 80)
+coordsLabel.TextSize               = 10
+coordsLabel.Font                   = Enum.Font.Gotham
+coordsLabel.TextXAlignment         = Enum.TextXAlignment.Left
+coordsLabel.Parent                 = frame
+
 local startBtn = Instance.new("TextButton")
 startBtn.Size             = UDim2.new(1, -12, 0, 26)
-startBtn.Position         = UDim2.new(0, 6, 0, 55)
+startBtn.Position         = UDim2.new(0, 6, 0, 70)
 startBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
 startBtn.BorderSizePixel  = 0
 startBtn.Text             = "Start Egg Collector"
@@ -754,6 +765,14 @@ RunService.Heartbeat:Connect(function()
     end
 
     -- fog is handled by hooks, no polling needed
+
+    -- Update coords display
+    local char2 = player.Character
+    local hrp2  = char2 and char2:FindFirstChild("HumanoidRootPart")
+    if hrp2 then
+        local p = hrp2.Position
+        coordsLabel.Text = string.format("X:%.0f Y:%.0f Z:%.0f", p.X, p.Y, p.Z)
+    end
 end)
 
 -- Clean up exp speed on character respawn
