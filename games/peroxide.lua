@@ -146,8 +146,8 @@ local function tryAddNPC(model)
         espType = "npc_vasto"
     end
 
-    -- Display name: egg name if it has one, otherwise the model's actual name
-    local displayName = hasEgg and getEggName(model) or "Vasto Lorde"
+    -- Vasto lordes always show as Vasto Lorde, egg npcs show their egg name
+    local displayName = isVasto and "Vasto Lorde" or getEggName(model)
 
     addEntry({
         type      = espType,
