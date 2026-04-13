@@ -279,7 +279,7 @@ coordsLabel.Parent                 = frame
 
 local startBtn = Instance.new("TextButton")
 startBtn.Size             = UDim2.new(1, -12, 0, 26)
-startBtn.Position         = UDim2.new(0, 6, 0, 70)
+startBtn.Position         = UDim2.new(0, 6, 0, 55)
 startBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
 startBtn.BorderSizePixel  = 0
 startBtn.Text             = "Start Egg Collector"
@@ -586,7 +586,7 @@ surfBtn.MouseButton1Click:Connect(function()
     if hrp then hrp.CFrame = CFrame.new(EXPEDITION_BACK + Vector3.new(0, 4, 0)) end
 end)
 
-makeToggle(430, "Auto Surface at 30% HP", function(active)
+makeToggle(430, "Auto Surface at 50% HP", function(active)
     autoSurfaceEnabled = active
 end)
 
