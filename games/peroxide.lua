@@ -152,7 +152,12 @@ local function tryAddNPC(model)
     addEntry({
         type      = espType,
         name      = displayName,
-        modelName = model.Name,  -- always send full model name for name toggle
+        modelName = (function()
+            local fn = model:GetAttribute("First_Name") or ""
+            local cl = model:GetAttribute("Clan") or ""
+            local qn = (fn .. " " .. cl):gsub("^%s+",""):gsub("%s+$","")
+            return qn ~= "" and qn or model.Name
+        end)(),  -- "Sombra Hollargo" style quest name
         part      = hrp,
         hum       = model:FindFirstChildOfClass("Humanoid"),
     })
