@@ -20,8 +20,8 @@ local expSpeedEnabled  = false
 local expFogEnabled    = false
 local autoFishEnabled  = false
 local autoSurfaceEnabled = false
-local SURFACE_HP_PCT    = 0.30  -- surface when HP drops below 30%
-local EXPEDITION_BACK   = Vector3.new(-60108, 2295, -24.4)  -- top of expedition shaft
+local SURFACE_HP_PCT    = 0.50  -- surface when HP drops below 50%
+local EXPEDITION_BACK   = Vector3.new(-60108.7, 2384, 33.5)  -- hole layer exit (exact)
 local EXP_SPEED        = 80
 local IN_EXPEDITION    = false
 local lastFogClear     = 0
@@ -900,4 +900,5 @@ while true do
         task.wait(0.1)
     end
 end
+
 
