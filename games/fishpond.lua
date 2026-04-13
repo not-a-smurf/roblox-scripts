@@ -845,52 +845,28 @@ local function inArc(arrowRot, targetRot, arcWidth)
     return math.abs(diff) <= arcWidth / 2
 end
 
-local lastClick    = 0
-local lastArrowRot = nil
-local wasInZone    = false
-
--- ARC_HALF: half the blue zone width in degrees
-local ARC_HALF = 35
-
--- CLICK_OFFSET: how many degrees before the zone edge to fire the click
--- Compensates for the small delay between detection and mouse1click() executing
--- Positive = click earlier (before entry), negative = click later (inside zone)
-local CLICK_DELAY_SECONDS = 0.02  -- fire 20ms after entering zone, works same regardless of arrow speed
+local lastClick = 0
+local wasInZone = false
 
 RunService.Heartbeat:Connect(function()
     if not autoFishEnabled then return end
     local arrow, target, holder = getMinigameElements()
     if not arrow or not target or not holder then return end
     if not holder.Visible then
-        lastArrowRot = nil
-        wasInZone    = false
+        wasInZone = false
         return
     end
 
-    local arrowRot  = arrow.Rotation
-    local targetRot = target.Rotation
+    -- Click at center of blue zone (within 10 degrees of target)
+    local diff   = normAngle(arrow.Rotation - target.Rotation + 180) - 180
+    local inZone = math.abs(diff) <= 10
 
-    -- Detect entry into zone using leading edge
-    -- Figure out spin direction
-    local spinDir = 0
-    if lastArrowRot then
-        local delta = normAngle(arrowRot - lastArrowRot + 180) - 180
-        if delta > 0 then spinDir = 1 elseif delta < 0 then spinDir = -1 end
-    end
-    lastArrowRot = arrowRot
-
-        local diff = normAngle(arrowRot - targetRot + 180) - 180
-    local inZone = math.abs(diff) <= ARC_HALF
-
-    -- On zone entry, wait CLICK_DELAY_SECONDS then fire - consistent regardless of arrow speed
-    if inZone and not wasInZone then
+    if inZone then
         local now = tick()
         if (now - lastClick) > 0.2 then
-            wasInZone = false
-            task.delay(CLICK_DELAY_SECONDS, function()
-                lastClick = tick()
-                mouse1click()
-            end)
+            lastClick = now
+            wasInZone = false  -- reset so zone respawn at pointer fires immediately
+            mouse1click()
         end
     else
         wasInZone = inZone
