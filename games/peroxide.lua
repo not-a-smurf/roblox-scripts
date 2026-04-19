@@ -32,7 +32,6 @@ _G.PeroxideESP_Stop = function()
     cached = {}
 end
 
--- Xeno uses http_request
 local function sendData(body)
     pcall(function()
         http_request({
@@ -47,7 +46,7 @@ end
 -- Helpers
 local function getNPCType(model)
     local name = model.Name:lower()
-    if name:find("vastolorde") or name:find("vastocar") or name:find("vastohallow") then
+    if name:find("vastolorde") or name:find("vastocar") or name:find("vastohollow") then
         return "vasto"
     elseif name:find("adjuchas") then
         return "adjuchas"
@@ -78,6 +77,27 @@ local function getEggName(model)
         if v.Name:lower():find("egg") then return v.Name end
     end
     return "Egg Hollow"
+end
+
+local function getQuestName(model)
+    -- Try GetAttribute first
+    local fn, cl = "", ""
+    pcall(function() fn = model:GetAttribute("First_Name") or "" end)
+    pcall(function() cl = model:GetAttribute("Clan") or "" end)
+
+    -- Fallback: check Stats folder for StringValue/StringValue children
+    if fn == "" then
+        local stats = model:FindFirstChild("Stats")
+        if stats then
+            local fnVal = stats:FindFirstChild("First_Name")
+            local clVal = stats:FindFirstChild("Clan")
+            if fnVal and fnVal.Value then fn = tostring(fnVal.Value) end
+            if clVal and clVal.Value then cl = tostring(clVal.Value) end
+        end
+    end
+
+    local qn = (fn .. " " .. cl):gsub("^%s+", ""):gsub("%s+$", "")
+    return qn ~= "" and qn or model.Name
 end
 
 local function getItemName(itemDrop)
@@ -135,7 +155,6 @@ local function tryAddNPC(model)
     local hasEgg = isEggNPC(model)
     local isVasto = isVastoLorde(model)
 
-    -- Only track if it has an egg OR is a vasto lorde (even without egg)
     if not hasEgg and not isVasto then return end
 
     local npcType = getNPCType(model)
@@ -146,18 +165,13 @@ local function tryAddNPC(model)
         espType = "npc_vasto"
     end
 
-    -- Vasto lordes always show as Vasto Lorde, egg npcs show their egg name
     local displayName = isVasto and "Vasto Lorde" or getEggName(model)
+    local questName   = isVasto and getQuestName(model) or ""
 
     addEntry({
         type      = espType,
         name      = displayName,
-        modelName = (function()
-            local fn = model:GetAttribute("First_Name") or ""
-            local cl = model:GetAttribute("Clan") or ""
-            local qn = (fn .. " " .. cl):gsub("^%s+",""):gsub("%s+$","")
-            return qn ~= "" and qn or model.Name
-        end)(),  -- "Sombra Hollargo" style quest name
+        modelName = questName,
         part      = hrp,
         hum       = model:FindFirstChildOfClass("Humanoid"),
     })
@@ -227,6 +241,82 @@ if effectsFolder then
         task.spawn(watchEffect, obj)
     end))
 end
+
+-- Watch Storm Delve objects
+local chestsFolder  = workspace:FindFirstChild("Chests")
+local orbsFolder    = workspace:FindFirstChild("Orbs")
+local rewardBoxes   = workspace  -- RewardBoxes are direct children of workspace
+
+local function watchChest(obj)
+    if not alive then return end
+    if not obj.Name:find("Chest_") then return end
+    if not obj:IsA("Model") then return end
+    local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+    if not primary then return end
+    addEntry({ type = "storm_chest", name = "Chest", part = primary, hum = nil, modelName = "" })
+    track(obj.AncestryChanged:Connect(function(_, p)
+        if not p then removeByPart(primary) end
+    end))
+end
+
+local function watchOrb(obj)
+    if not alive then return end
+    if not obj:IsA("BasePart") and not obj:IsA("Model") then return end
+    local primary = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
+    if not primary then return end
+    addEntry({ type = "storm_orb", name = "Orb", part = primary, hum = nil, modelName = "" })
+    track(obj.AncestryChanged:Connect(function(_, p)
+        if not p then removeByPart(primary) end
+    end))
+end
+
+local function watchRewardBox(obj)
+    if not alive then return end
+    if not obj.Name:find("RewardBox_") then return end
+    if not obj:IsA("Model") then return end
+    local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+    if not primary then return end
+    addEntry({ type = "storm_reward", name = "Reward Box", part = primary, hum = nil, modelName = "" })
+    track(obj.AncestryChanged:Connect(function(_, p)
+        if not p then removeByPart(primary) end
+    end))
+end
+
+-- Seed existing and watch for new storm objects
+task.spawn(function()
+    task.wait(2)  -- wait for workspace to populate
+    if not alive then return end
+
+    chestsFolder = workspace:FindFirstChild("Chests")
+    orbsFolder   = workspace:FindFirstChild("Orbs")
+
+    if chestsFolder then
+        for _, obj in ipairs(chestsFolder:GetChildren()) do task.spawn(watchChest, obj) end
+        track(chestsFolder.ChildAdded:Connect(function(obj) task.spawn(watchChest, obj) end))
+    end
+
+    if orbsFolder then
+        for _, obj in ipairs(orbsFolder:GetChildren()) do task.spawn(watchOrb, obj) end
+        track(orbsFolder.ChildAdded:Connect(function(obj) task.spawn(watchOrb, obj) end))
+    end
+
+    -- Watch workspace direct children for RewardBoxes
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj.Name:find("RewardBox_") then task.spawn(watchRewardBox, obj) end
+    end
+    track(workspace.ChildAdded:Connect(function(obj)
+        if obj.Name:find("RewardBox_") then task.spawn(watchRewardBox, obj) end
+        -- Also watch if Chests/Orbs folders appear late
+        if obj.Name == "Chests" then
+            for _, c2 in ipairs(obj:GetChildren()) do task.spawn(watchChest, c2) end
+            track(obj.ChildAdded:Connect(function(c2) task.spawn(watchChest, c2) end))
+        end
+        if obj.Name == "Orbs" then
+            for _, o2 in ipairs(obj:GetChildren()) do task.spawn(watchOrb, o2) end
+            track(obj.ChildAdded:Connect(function(o2) task.spawn(watchOrb, o2) end))
+        end
+    end))
+end)
 
 -- Send loop
 local lastSend = 0
