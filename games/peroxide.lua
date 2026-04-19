@@ -204,9 +204,24 @@ if effectsFolder then
     track(effectsFolder.DescendantAdded:Connect(function(obj) task.spawn(watchEffect, obj) end))
 end
 
+-- Periodic rescan fallback for entities that stream back into range
+-- Runs every 5 seconds to catch anything missed by events
+task.spawn(function()
+    while alive do
+        task.wait(0.5)
+        if not alive then break end
+        if not charsFolder then continue end
+        for _, obj in ipairs(charsFolder:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                task.spawn(tryAddNPC, obj)
+            end
+        end
+    end
+end)
+
 -- Watch Storm Delve objects
 task.spawn(function()
-    task.wait(2)
+    task.wait(0.5)
     if not alive then return end
     local chestsFolder = workspace:FindFirstChild("Chests")
     local orbsFolder   = workspace:FindFirstChild("Orbs")
@@ -313,3 +328,5 @@ track(RunService.Heartbeat:Connect(function()
 
     sendData(HttpService:JSONEncode({ npcs = npcs }))
 end))
+
+
