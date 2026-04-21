@@ -11,12 +11,14 @@ local CHEST_DELAY   = 5
 local LOOP_DELAY    = 5
 
 -- ── State ─────────────────────────────────────────────────────────────────────
+local active        = true  -- set to false on close to kill all loops
 local running       = false
 local flyEnabled    = false
 local noclipEnabled = false
 local flySpeed      = 1
 local walkSpeed     = 16
 local jumpPower     = 50
+local minimized     = false
 
 local function getHumanoid()
     local char = player.Character
@@ -144,43 +146,80 @@ titlePatch.BorderSizePixel  = 0
 titlePatch.Parent           = titleBar
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size                 = UDim2.new(1, -30, 1, 0)
+titleLabel.Size                   = UDim2.new(1, -60, 1, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text                 = "LB Collector"
-titleLabel.TextColor3           = Color3.fromRGB(220, 220, 220)
-titleLabel.TextSize             = 13
-titleLabel.Font                 = Enum.Font.GothamBold
-titleLabel.Parent               = titleBar
+titleLabel.Text                   = "LB Collector"
+titleLabel.TextColor3             = Color3.fromRGB(220, 220, 220)
+titleLabel.TextSize               = 13
+titleLabel.Font                   = Enum.Font.GothamBold
+titleLabel.Parent                 = titleBar
 
+-- Close button (X)
 local closeBtn = Instance.new("TextButton")
-closeBtn.Size                 = UDim2.new(0, 28, 0, 28)
-closeBtn.Position             = UDim2.new(1, -28, 0, 0)
-closeBtn.BackgroundTransparency = 1
-closeBtn.Text                 = "✕"
-closeBtn.TextColor3           = Color3.fromRGB(180, 180, 180)
-closeBtn.TextSize             = 13
-closeBtn.Font                 = Enum.Font.GothamBold
-closeBtn.Parent               = titleBar
+closeBtn.Size                   = UDim2.new(0, 28, 0, 28)
+closeBtn.Position               = UDim2.new(1, -28, 0, 0)
+closeBtn.BackgroundColor3       = Color3.fromRGB(200, 50, 50)
+closeBtn.BorderSizePixel        = 0
+closeBtn.Text                   = "X"
+closeBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize               = 12
+closeBtn.Font                   = Enum.Font.GothamBold
+closeBtn.Parent                 = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
-closeBtn.MouseEnter:Connect(function()  closeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)   end)
-closeBtn.MouseLeave:Connect(function()  closeBtn.TextColor3 = Color3.fromRGB(180, 180, 180) end)
+closeBtn.MouseEnter:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60) end)
+closeBtn.MouseLeave:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end)
 closeBtn.MouseButton1Click:Connect(function()
+    active  = false
     running = false
     disableFly()
     disableNoclip()
     screenGui:Destroy()
 end)
 
+-- Minimize button (-)
+local minBtn = Instance.new("TextButton")
+minBtn.Size                   = UDim2.new(0, 28, 0, 28)
+minBtn.Position               = UDim2.new(1, -58, 0, 0)
+minBtn.BackgroundColor3       = Color3.fromRGB(60, 60, 60)
+minBtn.BorderSizePixel        = 0
+minBtn.Text                   = "-"
+minBtn.TextColor3             = Color3.fromRGB(255, 255, 255)
+minBtn.TextSize               = 16
+minBtn.Font                   = Enum.Font.GothamBold
+minBtn.Parent                 = titleBar
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+minBtn.MouseEnter:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90) end)
+minBtn.MouseLeave:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end)
+
+-- Track all content frames for minimize/restore
+local contentFrames = {}
+
+minBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    minBtn.Text = minimized and "+" or "-"
+    frame.Size = minimized
+        and UDim2.new(0, W, 0, 28)
+        or  UDim2.new(0, W, 0, H)
+    for _, f in ipairs(contentFrames) do
+        f.Visible = not minimized
+    end
+end)
+
+local function trackContent(f) table.insert(contentFrames, f) end
+
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size                 = UDim2.new(1, -12, 0, 20)
-statusLabel.Position             = UDim2.new(0, 6, 0, 34)
+statusLabel.Size                   = UDim2.new(1, -12, 0, 20)
+statusLabel.Position               = UDim2.new(0, 6, 0, 34)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text                 = "Status: Idle"
-statusLabel.TextColor3           = Color3.fromRGB(160, 160, 160)
-statusLabel.TextSize             = 12
-statusLabel.Font                 = Enum.Font.Gotham
-statusLabel.TextXAlignment       = Enum.TextXAlignment.Left
-statusLabel.Parent               = frame
+statusLabel.Text                   = "Status: Idle"
+statusLabel.TextColor3             = Color3.fromRGB(160, 160, 160)
+statusLabel.TextSize               = 12
+statusLabel.Font                   = Enum.Font.Gotham
+statusLabel.TextXAlignment         = Enum.TextXAlignment.Left
+statusLabel.Parent                 = frame
+trackContent(statusLabel)
 
 local startBtn = Instance.new("TextButton")
 startBtn.Size             = UDim2.new(1, -12, 0, 26)
@@ -193,6 +232,7 @@ startBtn.TextSize         = 13
 startBtn.Font             = Enum.Font.GothamBold
 startBtn.Parent           = frame
 Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0, 6)
+trackContent(startBtn)
 
 startBtn.MouseButton1Click:Connect(function()
     running = not running
@@ -216,6 +256,7 @@ local function makeToggle(yPos, labelText, callback)
     row.BorderSizePixel  = 0
     row.Parent           = frame
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+    trackContent(row)
 
     local dot = Instance.new("Frame")
     dot.Size             = UDim2.new(0, 10, 0, 10)
@@ -226,31 +267,31 @@ local function makeToggle(yPos, labelText, callback)
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size                 = UDim2.new(1, -30, 1, 0)
-    lbl.Position             = UDim2.new(0, 28, 0, 0)
+    lbl.Size                   = UDim2.new(1, -30, 1, 0)
+    lbl.Position               = UDim2.new(0, 28, 0, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text                 = labelText
-    lbl.TextColor3           = Color3.fromRGB(160, 160, 160)
-    lbl.TextSize             = 12
-    lbl.Font                 = Enum.Font.Gotham
-    lbl.TextXAlignment       = Enum.TextXAlignment.Left
-    lbl.Parent               = row
+    lbl.Text                   = labelText
+    lbl.TextColor3             = Color3.fromRGB(160, 160, 160)
+    lbl.TextSize               = 12
+    lbl.Font                   = Enum.Font.Gotham
+    lbl.TextXAlignment         = Enum.TextXAlignment.Left
+    lbl.Parent                 = row
 
     local btn = Instance.new("TextButton")
-    btn.Size                 = UDim2.new(1, 0, 1, 0)
+    btn.Size                   = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
-    btn.Text                 = ""
-    btn.Parent               = row
+    btn.Text                   = ""
+    btn.Parent                 = row
 
-    local active = false
+    local activeState = false
     btn.MouseButton1Click:Connect(function()
-        active = not active
-        dot.BackgroundColor3 = active and Color3.fromRGB(50, 168, 82) or Color3.fromRGB(100, 100, 100)
-        lbl.TextColor3       = active and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(160, 160, 160)
-        if callback then callback(active) end
+        activeState = not activeState
+        dot.BackgroundColor3 = activeState and Color3.fromRGB(50, 168, 82) or Color3.fromRGB(100, 100, 100)
+        lbl.TextColor3       = activeState and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(160, 160, 160)
+        if callback then callback(activeState) end
     end)
 
-    return function() return active end
+    return function() return activeState end
 end
 
 local getReturnEnabled = makeToggle(90,  "Return to position")
@@ -263,26 +304,28 @@ div.Position         = UDim2.new(0, 6, 0, 152)
 div.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 div.BorderSizePixel  = 0
 div.Parent           = frame
+trackContent(div)
 
 local secLbl = Instance.new("TextLabel")
-secLbl.Size                 = UDim2.new(1, -12, 0, 14)
-secLbl.Position             = UDim2.new(0, 6, 0, 157)
+secLbl.Size                   = UDim2.new(1, -12, 0, 14)
+secLbl.Position               = UDim2.new(0, 6, 0, 157)
 secLbl.BackgroundTransparency = 1
-secLbl.Text                 = "MOVEMENT"
-secLbl.TextColor3           = Color3.fromRGB(90, 90, 90)
-secLbl.TextSize             = 10
-secLbl.Font                 = Enum.Font.GothamBold
-secLbl.TextXAlignment       = Enum.TextXAlignment.Left
-secLbl.Parent               = frame
+secLbl.Text                   = "MOVEMENT"
+secLbl.TextColor3             = Color3.fromRGB(90, 90, 90)
+secLbl.TextSize               = 10
+secLbl.Font                   = Enum.Font.GothamBold
+secLbl.TextXAlignment         = Enum.TextXAlignment.Left
+secLbl.Parent                 = frame
+trackContent(secLbl)
 
-makeToggle(175, "Noclip", function(active)
-    noclipEnabled = active
-    if active then enableNoclip() else disableNoclip() end
+makeToggle(175, "Noclip", function(act)
+    noclipEnabled = act
+    if act then enableNoclip() else disableNoclip() end
 end)
 
-makeToggle(205, "Fly  (WASD + Space/Shift)", function(active)
-    flyEnabled = active
-    if active then enableFly() else disableFly() end
+makeToggle(205, "Fly  (WASD + Space/Shift)", function(act)
+    flyEnabled = act
+    if act then enableFly() else disableFly() end
 end)
 
 -- ── Slider factory ────────────────────────────────────────────────────────────
@@ -296,17 +339,18 @@ local function makeSlider(yPos, labelText, minVal, maxVal, defaultVal, resetVal,
     row.BorderSizePixel  = 0
     row.Parent           = frame
     Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+    trackContent(row)
 
     local lbl = Instance.new("TextLabel")
-    lbl.Size                 = UDim2.new(0, 62, 1, 0)
-    lbl.Position             = UDim2.new(0, 8, 0, 0)
+    lbl.Size                   = UDim2.new(0, 62, 1, 0)
+    lbl.Position               = UDim2.new(0, 8, 0, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text                 = labelText
-    lbl.TextColor3           = Color3.fromRGB(160, 160, 160)
-    lbl.TextSize             = 11
-    lbl.Font                 = Enum.Font.Gotham
-    lbl.TextXAlignment       = Enum.TextXAlignment.Left
-    lbl.Parent               = row
+    lbl.Text                   = labelText
+    lbl.TextColor3             = Color3.fromRGB(160, 160, 160)
+    lbl.TextSize               = 11
+    lbl.Font                   = Enum.Font.Gotham
+    lbl.TextXAlignment         = Enum.TextXAlignment.Left
+    lbl.Parent                 = row
 
     local track = Instance.new("TextButton")
     track.Size             = UDim2.new(0, 76, 0, 6)
@@ -336,26 +380,29 @@ local function makeSlider(yPos, labelText, minVal, maxVal, defaultVal, resetVal,
     Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
 
     local valLbl = Instance.new("TextLabel")
-    valLbl.Size                 = UDim2.new(0, 30, 1, 0)
-    valLbl.Position             = UDim2.new(0, 153, 0, 0)
+    valLbl.Size                   = UDim2.new(0, 30, 1, 0)
+    valLbl.Position               = UDim2.new(0, 153, 0, 0)
     valLbl.BackgroundTransparency = 1
-    valLbl.Text                 = tostring(math.floor(defaultVal))
-    valLbl.TextColor3           = Color3.fromRGB(200, 200, 200)
-    valLbl.TextSize             = 11
-    valLbl.Font                 = Enum.Font.GothamBold
-    valLbl.Parent               = row
+    valLbl.Text                   = tostring(math.floor(defaultVal))
+    valLbl.TextColor3             = Color3.fromRGB(200, 200, 200)
+    valLbl.TextSize               = 11
+    valLbl.Font                   = Enum.Font.GothamBold
+    valLbl.Parent                 = row
 
     local resetBtn = Instance.new("TextButton")
     resetBtn.Size             = UDim2.new(0, 22, 0, 18)
     resetBtn.Position         = UDim2.new(1, -26, 0.5, -9)
-    resetBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+    resetBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     resetBtn.BorderSizePixel  = 0
-    resetBtn.Text             = "↺"
-    resetBtn.TextColor3       = Color3.fromRGB(180, 180, 180)
-    resetBtn.TextSize         = 13
+    resetBtn.Text             = "R"
+    resetBtn.TextColor3       = Color3.fromRGB(255, 160, 60)
+    resetBtn.TextSize         = 11
     resetBtn.Font             = Enum.Font.GothamBold
     resetBtn.Parent           = row
     Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 4)
+
+    resetBtn.MouseEnter:Connect(function() resetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100) end)
+    resetBtn.MouseLeave:Connect(function() resetBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)   end)
 
     local function setValue(val)
         val = math.clamp(math.floor(val + 0.5), minVal, maxVal)
@@ -378,25 +425,20 @@ local function makeSlider(yPos, labelText, minVal, maxVal, defaultVal, resetVal,
         end
     end)
 
-    -- The reset button snaps back to whatever the value was when the script loaded
-    resetBtn.MouseButton1Click:Connect(function()
-        setValue(resetVal)
-    end)
-
+    resetBtn.MouseButton1Click:Connect(function() setValue(resetVal) end)
     setValue(defaultVal)
 end
 
--- Reset values are captured at load time so they reflect the player's actual stats
 local initialWalkSpeed = walkSpeed
 local initialJumpPower = jumpPower
 
-makeSlider(235, "Fly spd",  1,    20,               1,                1, function(v) flySpeed = v end)
-makeSlider(265, "Walk spd", 1,  1000,   initialWalkSpeed,  initialWalkSpeed, function(v)
+makeSlider(235, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
+makeSlider(265, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
     walkSpeed = v
     local hum = getHumanoid()
     if hum then hum.WalkSpeed = v end
 end)
-makeSlider(295, "Jump pwr", 1,  1000,   initialJumpPower,  initialJumpPower, function(v)
+makeSlider(295, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
     jumpPower = v
     local hum = getHumanoid()
     if hum then hum.JumpPower = v end
@@ -443,7 +485,7 @@ local dots   = {"Searching..", "Searching..."}
 local dotIdx = 1
 
 task.spawn(function()
-    while true do
+    while active do
         if running then
             statusLabel.Text       = dots[dotIdx]
             statusLabel.TextColor3 = Color3.fromRGB(80, 200, 120)
@@ -460,19 +502,19 @@ local function addEsp(part, label, color)
 
     local bb = Instance.new("BillboardGui")
     bb.Name        = "_LBEsp"
-    bb.Size        = UDim2.new(0, 70, 0, 20)
+    bb.Size        = UDim2.new(0, 80, 0, 20)
     bb.StudsOffset = Vector3.new(0, 4, 0)
     bb.AlwaysOnTop = true
     bb.Parent      = part
 
     local txt = Instance.new("TextLabel")
-    txt.Size                 = UDim2.new(1, 0, 1, 0)
+    txt.Size                   = UDim2.new(1, 0, 1, 0)
     txt.BackgroundTransparency = 1
-    txt.Text                 = label
-    txt.TextColor3           = color
-    txt.TextSize             = 12
-    txt.Font                 = Enum.Font.GothamBold
-    txt.Parent               = bb
+    txt.Text                   = label
+    txt.TextColor3             = color
+    txt.TextSize               = 12
+    txt.Font                   = Enum.Font.GothamBold
+    txt.Parent                 = bb
 
     local hl = Instance.new("SelectionBox")
     hl.Name                = "_LBHighlight"
@@ -492,18 +534,51 @@ local function removeEsp(part)
     if hl then hl:Destroy() end
 end
 
+local function findBottlePart(folder, name)
+    -- Check direct child first
+    local direct = folder:FindFirstChild(name)
+    if direct and direct:IsA("BasePart") then return direct end
+    -- Search descendants for the actual BasePart (might be nested in a Model)
+    if direct then
+        local part = direct:FindFirstChildWhichIsA("BasePart", true)
+        if part then return part end
+    end
+    -- Also search by name anywhere in folder descendants
+    for _, v in ipairs(folder:GetDescendants()) do
+        if v.Name == name and v:IsA("BasePart") then return v end
+    end
+    return nil
+end
+
 task.spawn(function()
-    while true do
+    while active do
         for _, spawnFolder in ipairs(lbSearch:GetChildren()) do
             if spawnFolder:IsA("Script") or spawnFolder:IsA("LocalScript") then continue end
-            local lb  = spawnFolder:FindFirstChild("LBbottleSpawn")
-            local xll = spawnFolder:FindFirstChild("XLLbottleSpawn")
-            local ch  = spawnFolder:FindFirstChild("LBChest")
-            if lb  then if getEspEnabled() then addEsp(lb,  "LB Bottle",  Color3.fromRGB(100,180,255)) else removeEsp(lb)  end end
-            if xll then if getEspEnabled() then addEsp(xll, "XLL Bottle", Color3.fromRGB(100,255,150)) else removeEsp(xll) end end
-            if ch  then
-                local main = ch:FindFirstChild("Main") or ch
-                if getEspEnabled() then addEsp(main, "Chest", Color3.fromRGB(255,210,80)) else removeEsp(main) end
+
+            -- LB Bottle
+            local lbPart = findBottlePart(spawnFolder, "LBbottleSpawn")
+            if lbPart then
+                if getEspEnabled() then addEsp(lbPart, "LB Bottle", Color3.fromRGB(100,180,255))
+                else removeEsp(lbPart) end
+            end
+
+            -- XL Bottle (try both naming conventions)
+            local xlPart = findBottlePart(spawnFolder, "XLLbottleSpawn")
+                        or findBottlePart(spawnFolder, "XLbottleSpawn")
+                        or findBottlePart(spawnFolder, "XLBottleSpawn")
+            if xlPart then
+                if getEspEnabled() then addEsp(xlPart, "XL Bottle", Color3.fromRGB(100,255,150))
+                else removeEsp(xlPart) end
+            end
+
+            -- Chest
+            local ch = spawnFolder:FindFirstChild("LBChest")
+            if ch then
+                local main = ch:FindFirstChild("Main") or ch:FindFirstChildWhichIsA("BasePart") or ch
+                if main:IsA("BasePart") then
+                    if getEspEnabled() then addEsp(main, "Chest", Color3.fromRGB(255,210,80))
+                    else removeEsp(main) end
+                end
             end
         end
         task.wait(2)
@@ -526,40 +601,60 @@ local function getOrigin()
     if hrp then return hrp.CFrame end
 end
 
+local function findPrompt(obj)
+    if not obj then return nil end
+    -- Direct child first
+    local p = obj:FindFirstChildOfClass("ProximityPrompt")
+    if p then return p end
+    -- Search descendants
+    for _, v in ipairs(obj:GetDescendants()) do
+        if v:IsA("ProximityPrompt") then return v end
+    end
+    return nil
+end
+
 local function collectAll()
     for _, spawnFolder in ipairs(lbSearch:GetChildren()) do
-        if not running then return end
+        if not running or not active then return end
         if spawnFolder:IsA("Script") or spawnFolder:IsA("LocalScript") then continue end
 
+        -- LB Bottle
         local lb = spawnFolder:FindFirstChild("LBbottleSpawn")
         if lb then
-            local prompt = lb:FindFirstChild("ProximityPrompt")
+            local prompt = findPrompt(lb)
             if prompt then
                 local origin = getOrigin()
-                teleportTo(lb.CFrame) task.wait(0.1)
+                local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
+                teleportTo(part.CFrame) task.wait(0.1)
                 fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
                 if origin then teleportTo(origin) task.wait(0.1) end
             end
         end
 
+        -- XL Bottle
         local xll = spawnFolder:FindFirstChild("XLLbottleSpawn")
+                 or spawnFolder:FindFirstChild("XLbottleSpawn")
+                 or spawnFolder:FindFirstChild("XLBottleSpawn")
         if xll then
-            local prompt = xll:FindFirstChild("ProximityPrompt")
+            local prompt = findPrompt(xll)
             if prompt then
                 local origin = getOrigin()
-                teleportTo(xll.CFrame) task.wait(0.1)
+                local part = xll:IsA("BasePart") and xll or xll:FindFirstChildWhichIsA("BasePart") or xll
+                teleportTo(part.CFrame) task.wait(0.1)
                 fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
                 if origin then teleportTo(origin) task.wait(0.1) end
             end
         end
 
+        -- Chest
         local chest = spawnFolder:FindFirstChild("LBChest")
         if chest then
-            local prompt = chest:FindFirstChildWhichIsA("ProximityPrompt", true)
+            local prompt = findPrompt(chest)
             if prompt then
                 local origin = getOrigin()
-                local main = chest:FindFirstChild("Main") or chest
-                teleportTo(main.CFrame) task.wait(0.1)
+                local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
+                local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
+                teleportTo(mainPart.CFrame) task.wait(0.1)
                 fireproximityprompt(prompt) task.wait(0.5)
                 for _, item in ipairs(chest:GetDescendants()) do
                     if item:IsA("ProximityPrompt") and item ~= prompt then
@@ -574,10 +669,10 @@ local function collectAll()
 end
 
 -- ── Main loop ─────────────────────────────────────────────────────────────────
-while true do
+while active do
     if running then
         collectAll()
-        if running then task.wait(LOOP_DELAY) end
+        if running and active then task.wait(LOOP_DELAY) end
     else
         task.wait(0.1)
     end
