@@ -114,7 +114,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 335
+local W, H = 220, 368
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "LBCollector"
@@ -247,7 +247,52 @@ startBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ── Toggle factory ────────────────────────────────────────────────────────────
+-- ── Load Map button ──────────────────────────────────────────────────────────
+local loadMapBtn = Instance.new("TextButton")
+loadMapBtn.Size             = UDim2.new(1, -12, 0, 26)
+loadMapBtn.Position         = UDim2.new(0, 6, 0, 88)
+loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+loadMapBtn.BorderSizePixel  = 0
+loadMapBtn.Text             = "Load Map"
+loadMapBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+loadMapBtn.TextSize         = 13
+loadMapBtn.Font             = Enum.Font.GothamBold
+loadMapBtn.Parent           = frame
+Instance.new("UICorner", loadMapBtn).CornerRadius = UDim.new(0, 6)
+trackContent(loadMapBtn)
+
+loadMapBtn.MouseEnter:Connect(function() loadMapBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 220) end)
+loadMapBtn.MouseLeave:Connect(function() loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180) end)
+
+loadMapBtn.MouseButton1Click:Connect(function()
+    if not active then return end
+    loadMapBtn.Text             = "Loading..."
+    loadMapBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 40)
+
+    task.spawn(function()
+        -- Force all parts to load by reading their properties
+        -- This triggers streaming without moving the character at all
+        pcall(function() workspace.StreamingEnabled = false end)
+        pcall(function()
+            workspace.StreamingMinRadius    = 1024
+            workspace.StreamingTargetRadius = 10000
+        end)
+
+        local count = 0
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if not active then break end
+            if v:IsA("BasePart") then
+                local _ = v.Position  -- reading Position forces the part to stream in
+                count += 1
+                if count % 500 == 0 then
+                    task.wait()  -- yield every 500 parts to avoid freezing
+                end
+            end
+        end
+
+        loadMapBtn.Text             = "Load Map"
+        loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+    end)
 local function makeToggle(yPos, labelText, callback)
     local row = Instance.new("Frame")
     row.Size             = UDim2.new(1, -12, 0, 26)
@@ -294,13 +339,13 @@ local function makeToggle(yPos, labelText, callback)
     return function() return activeState end
 end
 
-local getReturnEnabled = makeToggle(90,  "Return to position")
-local getEspEnabled    = makeToggle(120, "Item ESP")
+local getReturnEnabled = makeToggle(120, "Return to position")
+local getEspEnabled    = makeToggle(150, "Item ESP")
 
 -- ── Divider ───────────────────────────────────────────────────────────────────
 local div = Instance.new("Frame")
 div.Size             = UDim2.new(1, -12, 0, 1)
-div.Position         = UDim2.new(0, 6, 0, 152)
+div.Position         = UDim2.new(0, 6, 0, 182)
 div.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 div.BorderSizePixel  = 0
 div.Parent           = frame
@@ -318,12 +363,12 @@ secLbl.TextXAlignment         = Enum.TextXAlignment.Left
 secLbl.Parent                 = frame
 trackContent(secLbl)
 
-makeToggle(175, "Noclip", function(act)
+makeToggle(205, "Noclip", function(act)
     noclipEnabled = act
     if act then enableNoclip() else disableNoclip() end
 end)
 
-makeToggle(205, "Fly  (WASD + Space/Shift)", function(act)
+makeToggle(235, "Fly  (WASD + Space/Shift)", function(act)
     flyEnabled = act
     if act then enableFly() else disableFly() end
 end)
@@ -432,13 +477,13 @@ end
 local initialWalkSpeed = walkSpeed
 local initialJumpPower = jumpPower
 
-makeSlider(235, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
-makeSlider(265, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
+makeSlider(265, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
+makeSlider(295, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
     walkSpeed = v
     local hum = getHumanoid()
     if hum then hum.WalkSpeed = v end
 end)
-makeSlider(295, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
+makeSlider(325, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
     jumpPower = v
     local hum = getHumanoid()
     if hum then hum.JumpPower = v end
