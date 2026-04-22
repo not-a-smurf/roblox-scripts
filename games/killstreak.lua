@@ -11,7 +11,7 @@ local CHEST_DELAY   = 5
 local LOOP_DELAY    = 5
 
 -- ── State ─────────────────────────────────────────────────────────────────────
-local active        = true  -- set to false on close to kill all loops
+local active        = true
 local running       = false
 local flyEnabled    = false
 local noclipEnabled = false
@@ -35,7 +35,6 @@ end
 
 -- ── Noclip ────────────────────────────────────────────────────────────────────
 local noclipConn
-
 local function enableNoclip()
     noclipConn = RunService.Stepped:Connect(function()
         local char = player.Character
@@ -45,7 +44,6 @@ local function enableNoclip()
         end
     end)
 end
-
 local function disableNoclip()
     if noclipConn then noclipConn:Disconnect() noclipConn = nil end
     local char = player.Character
@@ -65,20 +63,16 @@ local function enableFly()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
-
     hum.PlatformStand = true
-
     bodyVel          = Instance.new("BodyVelocity")
     bodyVel.Velocity = Vector3.zero
     bodyVel.MaxForce = Vector3.new(1e9, 1e9, 1e9)
     bodyVel.Parent   = hrp
-
     bodyGyro             = Instance.new("BodyGyro")
     bodyGyro.MaxTorque   = Vector3.new(1e9, 1e9, 1e9)
     bodyGyro.P           = 1e4
     bodyGyro.CFrame      = hrp.CFrame
     bodyGyro.Parent      = hrp
-
     flyConn = RunService.Heartbeat:Connect(function()
         if not flyEnabled then return end
         local cam = workspace.CurrentCamera
@@ -114,7 +108,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 368
+local W, H = 220, 305
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "LBCollector"
@@ -154,7 +148,7 @@ titleLabel.TextSize               = 13
 titleLabel.Font                   = Enum.Font.GothamBold
 titleLabel.Parent                 = titleBar
 
--- Close button (X)
+-- Close button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size                   = UDim2.new(0, 28, 0, 28)
 closeBtn.Position               = UDim2.new(1, -28, 0, 0)
@@ -166,7 +160,6 @@ closeBtn.TextSize               = 12
 closeBtn.Font                   = Enum.Font.GothamBold
 closeBtn.Parent                 = titleBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-
 closeBtn.MouseEnter:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60) end)
 closeBtn.MouseLeave:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end)
 closeBtn.MouseButton1Click:Connect(function()
@@ -177,7 +170,7 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Minimize button (-)
+-- Minimize button
 local minBtn = Instance.new("TextButton")
 minBtn.Size                   = UDim2.new(0, 28, 0, 28)
 minBtn.Position               = UDim2.new(1, -58, 0, 0)
@@ -189,25 +182,18 @@ minBtn.TextSize               = 16
 minBtn.Font                   = Enum.Font.GothamBold
 minBtn.Parent                 = titleBar
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
-
 minBtn.MouseEnter:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90) end)
 minBtn.MouseLeave:Connect(function() minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end)
 
--- Track all content frames for minimize/restore
 local contentFrames = {}
+local function trackContent(f) table.insert(contentFrames, f) end
 
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     minBtn.Text = minimized and "+" or "-"
-    frame.Size = minimized
-        and UDim2.new(0, W, 0, 28)
-        or  UDim2.new(0, W, 0, H)
-    for _, f in ipairs(contentFrames) do
-        f.Visible = not minimized
-    end
+    frame.Size  = minimized and UDim2.new(0, W, 0, 28) or UDim2.new(0, W, 0, H)
+    for _, f in ipairs(contentFrames) do f.Visible = not minimized end
 end)
-
-local function trackContent(f) table.insert(contentFrames, f) end
 
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size                   = UDim2.new(1, -12, 0, 20)
@@ -233,7 +219,6 @@ startBtn.Font             = Enum.Font.GothamBold
 startBtn.Parent           = frame
 Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0, 6)
 trackContent(startBtn)
-
 startBtn.MouseButton1Click:Connect(function()
     running = not running
     if running then
@@ -247,52 +232,7 @@ startBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ── Load Map button ──────────────────────────────────────────────────────────
-local loadMapBtn = Instance.new("TextButton")
-loadMapBtn.Size             = UDim2.new(1, -12, 0, 26)
-loadMapBtn.Position         = UDim2.new(0, 6, 0, 88)
-loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
-loadMapBtn.BorderSizePixel  = 0
-loadMapBtn.Text             = "Load Map"
-loadMapBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
-loadMapBtn.TextSize         = 13
-loadMapBtn.Font             = Enum.Font.GothamBold
-loadMapBtn.Parent           = frame
-Instance.new("UICorner", loadMapBtn).CornerRadius = UDim.new(0, 6)
-trackContent(loadMapBtn)
-
-loadMapBtn.MouseEnter:Connect(function() loadMapBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 220) end)
-loadMapBtn.MouseLeave:Connect(function() loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180) end)
-
-loadMapBtn.MouseButton1Click:Connect(function()
-    if not active then return end
-    loadMapBtn.Text             = "Loading..."
-    loadMapBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 40)
-
-    task.spawn(function()
-        -- Force all parts to load by reading their properties
-        -- This triggers streaming without moving the character at all
-        pcall(function() workspace.StreamingEnabled = false end)
-        pcall(function()
-            workspace.StreamingMinRadius    = 1024
-            workspace.StreamingTargetRadius = 10000
-        end)
-
-        local count = 0
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if not active then break end
-            if v:IsA("BasePart") then
-                local _ = v.Position  -- reading Position forces the part to stream in
-                count += 1
-                if count % 500 == 0 then
-                    task.wait()  -- yield every 500 parts to avoid freezing
-                end
-            end
-        end
-
-        loadMapBtn.Text             = "Load Map"
-        loadMapBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
-    end)
+-- ── Toggle factory ────────────────────────────────────────────────────────────
 local function makeToggle(yPos, labelText, callback)
     local row = Instance.new("Frame")
     row.Size             = UDim2.new(1, -12, 0, 26)
@@ -335,17 +275,15 @@ local function makeToggle(yPos, labelText, callback)
         lbl.TextColor3       = activeState and Color3.fromRGB(220, 220, 220) or Color3.fromRGB(160, 160, 160)
         if callback then callback(activeState) end
     end)
-
     return function() return activeState end
 end
 
-local getReturnEnabled = makeToggle(120, "Return to position")
-local getEspEnabled    = makeToggle(150, "Item ESP")
+local getEspEnabled = makeToggle(88, "Item ESP")
 
 -- ── Divider ───────────────────────────────────────────────────────────────────
 local div = Instance.new("Frame")
 div.Size             = UDim2.new(1, -12, 0, 1)
-div.Position         = UDim2.new(0, 6, 0, 182)
+div.Position         = UDim2.new(0, 6, 0, 120)
 div.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 div.BorderSizePixel  = 0
 div.Parent           = frame
@@ -353,7 +291,7 @@ trackContent(div)
 
 local secLbl = Instance.new("TextLabel")
 secLbl.Size                   = UDim2.new(1, -12, 0, 14)
-secLbl.Position               = UDim2.new(0, 6, 0, 157)
+secLbl.Position               = UDim2.new(0, 6, 0, 124)
 secLbl.BackgroundTransparency = 1
 secLbl.Text                   = "MOVEMENT"
 secLbl.TextColor3             = Color3.fromRGB(90, 90, 90)
@@ -363,12 +301,12 @@ secLbl.TextXAlignment         = Enum.TextXAlignment.Left
 secLbl.Parent                 = frame
 trackContent(secLbl)
 
-makeToggle(205, "Noclip", function(act)
+makeToggle(142, "Noclip", function(act)
     noclipEnabled = act
     if act then enableNoclip() else disableNoclip() end
 end)
 
-makeToggle(235, "Fly  (WASD + Space/Shift)", function(act)
+makeToggle(172, "Fly  (WASD + Space/Shift)", function(act)
     flyEnabled = act
     if act then enableFly() else disableFly() end
 end)
@@ -445,7 +383,6 @@ local function makeSlider(yPos, labelText, minVal, maxVal, defaultVal, resetVal,
     resetBtn.Font             = Enum.Font.GothamBold
     resetBtn.Parent           = row
     Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 4)
-
     resetBtn.MouseEnter:Connect(function() resetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100) end)
     resetBtn.MouseLeave:Connect(function() resetBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)   end)
 
@@ -469,7 +406,6 @@ local function makeSlider(yPos, labelText, minVal, maxVal, defaultVal, resetVal,
             slidingCallback(input.Position.X)
         end
     end)
-
     resetBtn.MouseButton1Click:Connect(function() setValue(resetVal) end)
     setValue(defaultVal)
 end
@@ -477,13 +413,13 @@ end
 local initialWalkSpeed = walkSpeed
 local initialJumpPower = jumpPower
 
-makeSlider(265, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
-makeSlider(295, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
+makeSlider(202, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
+makeSlider(232, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
     walkSpeed = v
     local hum = getHumanoid()
     if hum then hum.WalkSpeed = v end
 end)
-makeSlider(325, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
+makeSlider(262, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
     jumpPower = v
     local hum = getHumanoid()
     if hum then hum.JumpPower = v end
@@ -499,13 +435,11 @@ frame.InputBegan:Connect(function(input)
         startPos  = frame.Position
     end
 end)
-
 frame.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     if slidingCallback then
@@ -518,7 +452,6 @@ UserInputService.InputChanged:Connect(function(input)
         )
     end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         slidingCallback = nil
@@ -528,7 +461,6 @@ end)
 -- ── Status animation ──────────────────────────────────────────────────────────
 local dots   = {"Searching..", "Searching..."}
 local dotIdx = 1
-
 task.spawn(function()
     while active do
         if running then
@@ -544,14 +476,12 @@ end)
 local function addEsp(part, label, color)
     if not part or not part:IsA("BasePart") then return end
     if part:FindFirstChild("_LBEsp") then return end
-
     local bb = Instance.new("BillboardGui")
     bb.Name        = "_LBEsp"
     bb.Size        = UDim2.new(0, 80, 0, 20)
     bb.StudsOffset = Vector3.new(0, 4, 0)
     bb.AlwaysOnTop = true
     bb.Parent      = part
-
     local txt = Instance.new("TextLabel")
     txt.Size                   = UDim2.new(1, 0, 1, 0)
     txt.BackgroundTransparency = 1
@@ -560,7 +490,6 @@ local function addEsp(part, label, color)
     txt.TextSize               = 12
     txt.Font                   = Enum.Font.GothamBold
     txt.Parent                 = bb
-
     local hl = Instance.new("SelectionBox")
     hl.Name                = "_LBHighlight"
     hl.Adornee             = part
@@ -580,15 +509,12 @@ local function removeEsp(part)
 end
 
 local function findBottlePart(folder, name)
-    -- Check direct child first
     local direct = folder:FindFirstChild(name)
     if direct and direct:IsA("BasePart") then return direct end
-    -- Search descendants for the actual BasePart (might be nested in a Model)
     if direct then
         local part = direct:FindFirstChildWhichIsA("BasePart", true)
         if part then return part end
     end
-    -- Also search by name anywhere in folder descendants
     for _, v in ipairs(folder:GetDescendants()) do
         if v.Name == name and v:IsA("BasePart") then return v end
     end
@@ -599,15 +525,11 @@ task.spawn(function()
     while active do
         for _, spawnFolder in ipairs(lbSearch:GetChildren()) do
             if spawnFolder:IsA("Script") or spawnFolder:IsA("LocalScript") then continue end
-
-            -- LB Bottle
             local lbPart = findBottlePart(spawnFolder, "LBbottleSpawn")
             if lbPart then
                 if getEspEnabled() then addEsp(lbPart, "LB Bottle", Color3.fromRGB(100,180,255))
                 else removeEsp(lbPart) end
             end
-
-            -- XL Bottle (try both naming conventions)
             local xlPart = findBottlePart(spawnFolder, "XLLbottleSpawn")
                         or findBottlePart(spawnFolder, "XLbottleSpawn")
                         or findBottlePart(spawnFolder, "XLBottleSpawn")
@@ -615,12 +537,10 @@ task.spawn(function()
                 if getEspEnabled() then addEsp(xlPart, "XL Bottle", Color3.fromRGB(100,255,150))
                 else removeEsp(xlPart) end
             end
-
-            -- Chest
             local ch = spawnFolder:FindFirstChild("LBChest")
             if ch then
                 local main = ch:FindFirstChild("Main") or ch:FindFirstChildWhichIsA("BasePart") or ch
-                if main:IsA("BasePart") then
+                if main and main:IsA("BasePart") then
                     if getEspEnabled() then addEsp(main, "Chest", Color3.fromRGB(255,210,80))
                     else removeEsp(main) end
                 end
@@ -630,28 +550,11 @@ task.spawn(function()
     end
 end)
 
--- ── Collector ─────────────────────────────────────────────────────────────────
-local function teleportTo(cf)
-    local char = player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.CFrame = cf + Vector3.new(0, 4, 0) end
-end
-
-local function getOrigin()
-    if not getReturnEnabled() then return nil end
-    local char = player.Character
-    if not char then return nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then return hrp.CFrame end
-end
-
+-- ── Collector (no teleport — fireproximityprompt ignores distance) ─────────────
 local function findPrompt(obj)
     if not obj then return nil end
-    -- Direct child first
     local p = obj:FindFirstChildOfClass("ProximityPrompt")
     if p then return p end
-    -- Search descendants
     for _, v in ipairs(obj:GetDescendants()) do
         if v:IsA("ProximityPrompt") then return v end
     end
@@ -663,51 +566,43 @@ local function collectAll()
         if not running or not active then return end
         if spawnFolder:IsA("Script") or spawnFolder:IsA("LocalScript") then continue end
 
-        -- LB Bottle
         local lb = spawnFolder:FindFirstChild("LBbottleSpawn")
         if lb then
             local prompt = findPrompt(lb)
             if prompt then
-                local origin = getOrigin()
-                local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
-                teleportTo(part.CFrame) task.wait(0.1)
-                fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
-                if origin then teleportTo(origin) task.wait(0.1) end
+                prompt.MaxActivationDistance = math.huge
+                fireproximityprompt(prompt)
+                task.wait(COLLECT_DELAY)
             end
         end
 
-        -- XL Bottle
         local xll = spawnFolder:FindFirstChild("XLLbottleSpawn")
                  or spawnFolder:FindFirstChild("XLbottleSpawn")
                  or spawnFolder:FindFirstChild("XLBottleSpawn")
         if xll then
             local prompt = findPrompt(xll)
             if prompt then
-                local origin = getOrigin()
-                local part = xll:IsA("BasePart") and xll or xll:FindFirstChildWhichIsA("BasePart") or xll
-                teleportTo(part.CFrame) task.wait(0.1)
-                fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
-                if origin then teleportTo(origin) task.wait(0.1) end
+                prompt.MaxActivationDistance = math.huge
+                fireproximityprompt(prompt)
+                task.wait(COLLECT_DELAY)
             end
         end
 
-        -- Chest
         local chest = spawnFolder:FindFirstChild("LBChest")
         if chest then
             local prompt = findPrompt(chest)
             if prompt then
-                local origin = getOrigin()
-                local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
-                local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
-                teleportTo(mainPart.CFrame) task.wait(0.1)
-                fireproximityprompt(prompt) task.wait(0.5)
+                prompt.MaxActivationDistance = math.huge
+                fireproximityprompt(prompt)
+                task.wait(0.5)
                 for _, item in ipairs(chest:GetDescendants()) do
                     if item:IsA("ProximityPrompt") and item ~= prompt then
-                        fireproximityprompt(item) task.wait(0.2)
+                        item.MaxActivationDistance = math.huge
+                        fireproximityprompt(item)
+                        task.wait(0.2)
                     end
                 end
                 task.wait(CHEST_DELAY)
-                if origin then teleportTo(origin) task.wait(0.1) end
             end
         end
     end
