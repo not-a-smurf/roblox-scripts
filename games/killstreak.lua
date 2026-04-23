@@ -725,11 +725,11 @@ local function findPrompt(obj)
     return nil
 end
 
-local function teleportTo(cf)
+local function teleportTo(cf, yOffset)
     local char = player.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.CFrame = cf + Vector3.new(0, 3, 0) end
+    if hrp then hrp.CFrame = cf + Vector3.new(0, yOffset or 3, 0) end
 end
 
 local function getOriginCF()
@@ -750,9 +750,12 @@ local function collectAll()
             local prompt = findPrompt(lb)
             if prompt then
                 local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
-                teleportTo(part.CFrame) task.wait(0.05)
+                teleportTo(part.CFrame)
+                task.wait(0.3)  -- wait for server to register position
                 prompt.MaxActivationDistance = math.huge
-                fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
+                fireproximityprompt(prompt)
+                task.wait(COLLECT_DELAY)
+                if origin then teleportTo(origin) task.wait(0.2) end
             end
         end
 
