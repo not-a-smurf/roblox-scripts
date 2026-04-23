@@ -748,14 +748,14 @@ local function collectAll()
         local lb = spawnFolder:FindFirstChild("LBbottleSpawn")
         if lb then
             local prompt = findPrompt(lb)
-            if prompt then
+            if prompt and prompt.Enabled then  -- skip if bottle not yet spawned
                 local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
-                teleportTo(part.CFrame)
-                task.wait(0.3)  -- wait for server to register position
+                teleportTo(part.CFrame, 0)
+                task.wait(0.3)
                 prompt.MaxActivationDistance = math.huge
                 fireproximityprompt(prompt)
                 task.wait(COLLECT_DELAY)
-                if origin then teleportTo(origin) task.wait(0.2) end
+                if origin then teleportTo(origin, 0) task.wait(0.2) end
             end
         end
 
@@ -764,8 +764,9 @@ local function collectAll()
                  or spawnFolder:FindFirstChild("XLBottleSpawn")
         if xll then
             local part = xll:IsA("BasePart") and xll or xll:FindFirstChildWhichIsA("BasePart") or xll
-            if part then
-                teleportTo(part.CFrame)
+            local xllChk = findPrompt(xll)
+            if part and (not xllChk or xllChk.Enabled) then
+                teleportTo(part.CFrame, 0)
                 -- Prompt may be added dynamically by server script - wait up to 1s for it
                 local prompt = nil
                 for _ = 1, 10 do
@@ -786,7 +787,7 @@ local function collectAll()
         local chest = spawnFolder:FindFirstChild("LBChest")
         if chest then
             local openPrompt = findPrompt(chest)
-            if openPrompt then
+            if openPrompt and openPrompt.Enabled then  -- only act if chest is actually spawned
                 local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
                 local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
                 teleportTo(mainPart.CFrame) task.wait(0.05)
@@ -818,7 +819,7 @@ local function collectAll()
     end
     -- Return to origin after collecting everything
     if origin and running and active then
-        teleportTo(origin)
+        teleportTo(origin, 0)
     end
 end
 
