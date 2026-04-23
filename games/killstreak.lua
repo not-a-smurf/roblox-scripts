@@ -108,7 +108,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 305
+local W, H = 220, 385
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "LBCollector"
@@ -167,6 +167,17 @@ closeBtn.MouseButton1Click:Connect(function()
     running = false
     disableFly()
     disableNoclip()
+    -- Remove all ESP from every part before destroying
+    for _, spawnFolder in ipairs(lbSearch:GetChildren()) do
+        for _, child in ipairs(spawnFolder:GetDescendants()) do
+            if child:IsA("BasePart") then
+                local bb = child:FindFirstChild("_LBEsp")
+                if bb then bb:Destroy() end
+                local hl = child:FindFirstChild("_LBHighlight")
+                if hl then hl:Destroy() end
+            end
+        end
+    end
     screenGui:Destroy()
 end)
 
@@ -539,7 +550,11 @@ task.spawn(function()
             end
             local ch = spawnFolder:FindFirstChild("LBChest")
             if ch then
-                local main = ch:FindFirstChild("Main") or ch:FindFirstChildWhichIsA("BasePart") or ch
+                local main = ch:FindFirstChild("Main")
+                if main and not main:IsA("BasePart") then
+                    main = main:FindFirstChildWhichIsA("BasePart", true)
+                end
+                if not main then main = ch:FindFirstChildWhichIsA("BasePart", true) end
                 if main and main:IsA("BasePart") then
                     if getEspEnabled() then addEsp(main, "Chest", Color3.fromRGB(255,210,80))
                     else removeEsp(main) end
@@ -608,6 +623,291 @@ local function collectAll()
     end
 end
 
+
+-- ── Hitbox ────────────────────────────────────────────────────────────────────
+local div2 = Instance.new("Frame")
+div2.Size             = UDim2.new(1, -12, 0, 1)
+div2.Position         = UDim2.new(0, 6, 0, 295)
+div2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+div2.BorderSizePixel  = 0
+div2.Parent           = frame
+trackContent(div2)
+
+local hbSecLbl = Instance.new("TextLabel")
+hbSecLbl.Size                   = UDim2.new(1, -12, 0, 14)
+hbSecLbl.Position               = UDim2.new(0, 6, 0, 299)
+hbSecLbl.BackgroundTransparency = 1
+hbSecLbl.Text                   = "HITBOX"
+hbSecLbl.TextColor3             = Color3.fromRGB(90, 90, 90)
+hbSecLbl.TextSize               = 10
+hbSecLbl.Font                   = Enum.Font.GothamBold
+hbSecLbl.TextXAlignment         = Enum.TextXAlignment.Left
+hbSecLbl.Parent                 = frame
+trackContent(hbSecLbl)
+
+-- Tool dropdown
+local selectedTool = nil
+
+local dropRow = Instance.new("Frame")
+dropRow.Size             = UDim2.new(1, -12, 0, 26)
+dropRow.Position         = UDim2.new(0, 6, 0, 317)
+dropRow.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+dropRow.BorderSizePixel  = 0
+dropRow.Parent           = frame
+Instance.new("UICorner", dropRow).CornerRadius = UDim.new(0, 6)
+trackContent(dropRow)
+
+local dropBtn = Instance.new("TextButton")
+dropBtn.Size                   = UDim2.new(1, 0, 1, 0)
+dropBtn.BackgroundTransparency = 1
+dropBtn.Text                   = "Select Tool  v"
+dropBtn.TextColor3             = Color3.fromRGB(160, 160, 160)
+dropBtn.TextSize               = 11
+dropBtn.Font                   = Enum.Font.Gotham
+dropBtn.Parent                 = dropRow
+
+-- Dropdown popup (opens upward, high ZIndex)
+local dropList = Instance.new("Frame")
+dropList.Size             = UDim2.new(1, -12, 0, 0)
+dropList.Position         = UDim2.new(0, 6, 0, 317)
+dropList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+dropList.BorderSizePixel  = 0
+dropList.ZIndex           = 20
+dropList.Visible          = false
+dropList.ClipsDescendants = true
+dropList.Parent           = frame
+Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 6)
+
+local dropScroll = Instance.new("ScrollingFrame")
+dropScroll.Size                   = UDim2.new(1, 0, 1, 0)
+dropScroll.BackgroundTransparency = 1
+dropScroll.BorderSizePixel        = 0
+dropScroll.ScrollBarThickness     = 4
+dropScroll.ZIndex                 = 20
+dropScroll.Parent                 = dropList
+local dropLayout = Instance.new("UIListLayout")
+dropLayout.Padding   = UDim.new(0, 2)
+dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+dropLayout.Parent    = dropScroll
+local dropPad = Instance.new("UIPadding")
+dropPad.PaddingLeft = UDim.new(0, 4)
+dropPad.Parent      = dropScroll
+
+local function refreshDropdown()
+    for _, ch in ipairs(dropScroll:GetChildren()) do
+        if ch:IsA("TextButton") then ch:Destroy() end
+    end
+    local tools = {}
+    for _, t in ipairs(player.Backpack:GetChildren()) do
+        if t:IsA("Tool") then table.insert(tools, t) end
+    end
+    local char = player.Character
+    if char then
+        for _, t in ipairs(char:GetChildren()) do
+            if t:IsA("Tool") then table.insert(tools, t) end
+        end
+    end
+    if #tools == 0 then
+        local none = Instance.new("TextButton")
+        none.Size                   = UDim2.new(1, -4, 0, 24)
+        none.BackgroundTransparency = 1
+        none.Text                   = "No tools found"
+        none.TextColor3             = Color3.fromRGB(100, 100, 100)
+        none.TextSize               = 11
+        none.Font                   = Enum.Font.Gotham
+        none.ZIndex                 = 20
+        none.Parent                 = dropScroll
+    end
+    for _, tool in ipairs(tools) do
+        local entry = Instance.new("TextButton")
+        entry.Size             = UDim2.new(1, -4, 0, 24)
+        entry.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        entry.BorderSizePixel  = 0
+        entry.Text             = tool.Name
+        entry.TextColor3       = Color3.fromRGB(200, 200, 200)
+        entry.TextSize         = 11
+        entry.Font             = Enum.Font.Gotham
+        entry.ZIndex           = 20
+        entry.Parent           = dropScroll
+        Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 4)
+        entry.MouseEnter:Connect(function() entry.BackgroundColor3 = Color3.fromRGB(60,60,60) end)
+        entry.MouseLeave:Connect(function() entry.BackgroundColor3 = Color3.fromRGB(45,45,45) end)
+        entry.MouseButton1Click:Connect(function()
+            selectedTool     = tool
+            dropBtn.Text     = tool.Name .. "  v"
+            dropList.Visible = false
+        end)
+    end
+    local count = math.max(1, #tools)
+    local listH = math.min(count * 26, 104)
+    dropList.Position     = UDim2.new(0, 6, 0, 317 - listH - 2)
+    dropList.Size         = UDim2.new(1, -12, 0, listH)
+    dropScroll.CanvasSize = UDim2.new(0, 0, 0, count * 26)
+end
+
+dropBtn.MouseButton1Click:Connect(function()
+    if dropList.Visible then
+        dropList.Visible = false
+    else
+        refreshDropdown()
+        dropList.Visible = true
+    end
+end)
+
+-- Hitbox toggle + size slider
+local hitboxEnabled   = false
+local hitboxSize      = 1.0
+local hitboxOrigSizes = {}
+
+local hbRow = Instance.new("Frame")
+hbRow.Size             = UDim2.new(1, -12, 0, 26)
+hbRow.Position         = UDim2.new(0, 6, 0, 347)
+hbRow.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+hbRow.BorderSizePixel  = 0
+hbRow.Parent           = frame
+Instance.new("UICorner", hbRow).CornerRadius = UDim.new(0, 6)
+trackContent(hbRow)
+
+local hbDot = Instance.new("Frame")
+hbDot.Size             = UDim2.new(0, 10, 0, 10)
+hbDot.Position         = UDim2.new(0, 8, 0.5, -5)
+hbDot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+hbDot.BorderSizePixel  = 0
+hbDot.Parent           = hbRow
+Instance.new("UICorner", hbDot).CornerRadius = UDim.new(1, 0)
+
+local hbLbl = Instance.new("TextLabel")
+hbLbl.Size                   = UDim2.new(0, 42, 1, 0)
+hbLbl.Position               = UDim2.new(0, 22, 0, 0)
+hbLbl.BackgroundTransparency = 1
+hbLbl.Text                   = "Hitbox"
+hbLbl.TextColor3             = Color3.fromRGB(160, 160, 160)
+hbLbl.TextSize               = 11
+hbLbl.Font                   = Enum.Font.Gotham
+hbLbl.TextXAlignment         = Enum.TextXAlignment.Left
+hbLbl.Parent                 = hbRow
+
+local hbTrack = Instance.new("TextButton")
+hbTrack.Size             = UDim2.new(0, 60, 0, 6)
+hbTrack.Position         = UDim2.new(0, 68, 0.5, -3)
+hbTrack.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+hbTrack.BorderSizePixel  = 0
+hbTrack.Text             = ""
+hbTrack.AutoButtonColor  = false
+hbTrack.Parent           = hbRow
+Instance.new("UICorner", hbTrack).CornerRadius = UDim.new(1, 0)
+
+local hbFill = Instance.new("Frame")
+hbFill.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
+hbFill.BorderSizePixel  = 0
+hbFill.Size             = UDim2.new(0, 0, 1, 0)
+hbFill.Parent           = hbTrack
+Instance.new("UICorner", hbFill).CornerRadius = UDim.new(1, 0)
+
+local hbThumb = Instance.new("Frame")
+hbThumb.Size             = UDim2.new(0, 12, 0, 12)
+hbThumb.AnchorPoint      = Vector2.new(0.5, 0.5)
+hbThumb.Position         = UDim2.new(0, 0, 0.5, 0)
+hbThumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+hbThumb.BorderSizePixel  = 0
+hbThumb.ZIndex           = 3
+hbThumb.Parent           = hbTrack
+Instance.new("UICorner", hbThumb).CornerRadius = UDim.new(1, 0)
+
+local hbValLbl = Instance.new("TextLabel")
+hbValLbl.Size                   = UDim2.new(0, 28, 1, 0)
+hbValLbl.Position               = UDim2.new(0, 132, 0, 0)
+hbValLbl.BackgroundTransparency = 1
+hbValLbl.Text                   = "1x"
+hbValLbl.TextColor3             = Color3.fromRGB(200, 200, 200)
+hbValLbl.TextSize               = 11
+hbValLbl.Font                   = Enum.Font.GothamBold
+hbValLbl.Parent                 = hbRow
+
+local hbResetBtn = Instance.new("TextButton")
+hbResetBtn.Size             = UDim2.new(0, 22, 0, 18)
+hbResetBtn.Position         = UDim2.new(1, -26, 0.5, -9)
+hbResetBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+hbResetBtn.BorderSizePixel  = 0
+hbResetBtn.Text             = "R"
+hbResetBtn.TextColor3       = Color3.fromRGB(255, 160, 60)
+hbResetBtn.TextSize         = 11
+hbResetBtn.Font             = Enum.Font.GothamBold
+hbResetBtn.Parent           = hbRow
+Instance.new("UICorner", hbResetBtn).CornerRadius = UDim.new(0, 4)
+hbResetBtn.MouseEnter:Connect(function() hbResetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100) end)
+hbResetBtn.MouseLeave:Connect(function() hbResetBtn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
+
+local HB_MIN, HB_MAX = 0.5, 10.0
+
+local function setHbValue(val)
+    val = math.clamp(math.floor(val * 10 + 0.5) / 10, HB_MIN, HB_MAX)
+    hitboxSize = val
+    local t = (val - HB_MIN) / (HB_MAX - HB_MIN)
+    hbFill.Size      = UDim2.new(t, 0, 1, 0)
+    hbThumb.Position = UDim2.new(t, 0, 0.5, 0)
+    hbValLbl.Text    = val .. "x"
+end
+
+hbTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        slidingCallback = function(x)
+            local rel = (x - hbTrack.AbsolutePosition.X) / hbTrack.AbsoluteSize.X
+            setHbValue(HB_MIN + (HB_MAX - HB_MIN) * math.clamp(rel, 0, 1))
+        end
+        slidingCallback(input.Position.X)
+    end
+end)
+hbResetBtn.MouseButton1Click:Connect(function() setHbValue(1.0) end)
+setHbValue(1.0)
+
+local function restoreHitbox()
+    for part, origSize in pairs(hitboxOrigSizes) do
+        pcall(function()
+            if part and part.Parent then part.Size = origSize end
+        end)
+    end
+    hitboxOrigSizes = {}
+end
+
+local function applyHitbox()
+    if not selectedTool then return end
+    local char = player.Character
+    local src = (char and char:FindFirstChild(selectedTool.Name))
+             or player.Backpack:FindFirstChild(selectedTool.Name)
+    if not src then return end
+    for _, part in ipairs(src:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if not hitboxOrigSizes[part] then hitboxOrigSizes[part] = part.Size end
+            part.Size = hitboxOrigSizes[part] * hitboxSize
+        end
+    end
+    local handle = src:FindFirstChild("Handle")
+    if handle and handle:IsA("BasePart") then
+        if not hitboxOrigSizes[handle] then hitboxOrigSizes[handle] = handle.Size end
+        handle.Size = hitboxOrigSizes[handle] * hitboxSize
+    end
+end
+
+local hbToggleBtn = Instance.new("TextButton")
+hbToggleBtn.Size                   = UDim2.new(0, 64, 1, 0)
+hbToggleBtn.BackgroundTransparency = 1
+hbToggleBtn.Text                   = ""
+hbToggleBtn.Parent                 = hbRow
+hbToggleBtn.MouseButton1Click:Connect(function()
+    hitboxEnabled = not hitboxEnabled
+    hbDot.BackgroundColor3 = hitboxEnabled and Color3.fromRGB(50,168,82) or Color3.fromRGB(100,100,100)
+    hbLbl.TextColor3       = hitboxEnabled and Color3.fromRGB(220,220,220) or Color3.fromRGB(160,160,160)
+    if not hitboxEnabled then restoreHitbox() end
+end)
+
+task.spawn(function()
+    while active do
+        if hitboxEnabled then applyHitbox() end
+        task.wait(0.1)
+    end
+    restoreHitbox()
+end)
 -- ── Main loop ─────────────────────────────────────────────────────────────────
 while active do
     if running then
@@ -617,3 +917,4 @@ while active do
         task.wait(0.1)
     end
 end
+
