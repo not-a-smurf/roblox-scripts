@@ -6,7 +6,7 @@ local player   = Players.LocalPlayer
 local lbSearch = workspace:WaitForChild("OthersSpecialEvents"):WaitForChild("LBSearch")
 
 -- ── Config ────────────────────────────────────────────────────────────────────
-local COLLECT_DELAY = 0.3
+local COLLECT_DELAY = 0.8
 local CHEST_DELAY   = 5
 local LOOP_DELAY    = 5
 
@@ -425,10 +425,159 @@ local initialWalkSpeed = walkSpeed
 local initialJumpPower = jumpPower
 
 makeSlider(202, "Fly spd",  1,  400,              1,               1, function(v) flySpeed = v end)
-makeSlider(232, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
-    walkSpeed = v
+-- TP Walk toggle
+local tpWalkEnabled = false
+local tpWalkSpeed   = 50
+local tpWalkConn
+
+local function stopTpWalk()
+    tpWalkEnabled = false
+    if tpWalkConn then tpWalkConn:Disconnect() tpWalkConn = nil end
     local hum = getHumanoid()
-    if hum then hum.WalkSpeed = v end
+    if hum then hum.WalkSpeed = walkSpeed end
+end
+
+local function startTpWalk()
+    if tpWalkConn then tpWalkConn:Disconnect() tpWalkConn = nil end
+    local hum = getHumanoid()
+    if hum then hum.WalkSpeed = 0 end
+    tpWalkConn = RunService.Heartbeat:Connect(function(dt)
+        if not tpWalkEnabled or not active then return end
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local cam = workspace.CurrentCamera
+        local dir = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector  end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if dir.Magnitude > 0 then
+            dir = Vector3.new(dir.X, 0, dir.Z).Unit  -- keep on ground plane
+            hrp.CFrame = hrp.CFrame + dir * tpWalkSpeed * dt
+        end
+    end)
+end
+
+-- TP Walk row (toggle + speed slider on same row, reusing makeSlider style)
+local tpRow = Instance.new("Frame")
+tpRow.Size             = UDim2.new(1, -12, 0, 26)
+tpRow.Position         = UDim2.new(0, 6, 0, 232)
+tpRow.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+tpRow.BorderSizePixel  = 0
+tpRow.Parent           = frame
+Instance.new("UICorner", tpRow).CornerRadius = UDim.new(0, 6)
+trackContent(tpRow)
+
+local tpDot = Instance.new("Frame")
+tpDot.Size             = UDim2.new(0, 10, 0, 10)
+tpDot.Position         = UDim2.new(0, 8, 0.5, -5)
+tpDot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+tpDot.BorderSizePixel  = 0
+tpDot.Parent           = tpRow
+Instance.new("UICorner", tpDot).CornerRadius = UDim.new(1, 0)
+
+local tpLbl = Instance.new("TextLabel")
+tpLbl.Size                   = UDim2.new(0, 46, 1, 0)
+tpLbl.Position               = UDim2.new(0, 22, 0, 0)
+tpLbl.BackgroundTransparency = 1
+tpLbl.Text                   = "TP Walk"
+tpLbl.TextColor3             = Color3.fromRGB(160, 160, 160)
+tpLbl.TextSize               = 11
+tpLbl.Font                   = Enum.Font.Gotham
+tpLbl.TextXAlignment         = Enum.TextXAlignment.Left
+tpLbl.Parent                 = tpRow
+
+local tpTrack = Instance.new("TextButton")
+tpTrack.Size             = UDim2.new(0, 60, 0, 6)
+tpTrack.Position         = UDim2.new(0, 72, 0.5, -3)
+tpTrack.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+tpTrack.BorderSizePixel  = 0
+tpTrack.Text             = ""
+tpTrack.AutoButtonColor  = false
+tpTrack.Parent           = tpRow
+Instance.new("UICorner", tpTrack).CornerRadius = UDim.new(1, 0)
+
+local tpFill = Instance.new("Frame")
+tpFill.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
+tpFill.BorderSizePixel  = 0
+tpFill.Size             = UDim2.new((50-1)/(400-1), 0, 1, 0)
+tpFill.Parent           = tpTrack
+Instance.new("UICorner", tpFill).CornerRadius = UDim.new(1, 0)
+
+local tpThumb = Instance.new("Frame")
+tpThumb.Size             = UDim2.new(0, 12, 0, 12)
+tpThumb.AnchorPoint      = Vector2.new(0.5, 0.5)
+tpThumb.Position         = UDim2.new((50-1)/(400-1), 0, 0.5, 0)
+tpThumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+tpThumb.BorderSizePixel  = 0
+tpThumb.ZIndex           = 3
+tpThumb.Parent           = tpTrack
+Instance.new("UICorner", tpThumb).CornerRadius = UDim.new(1, 0)
+
+local tpValLbl = Instance.new("TextLabel")
+tpValLbl.Size                   = UDim2.new(0, 30, 1, 0)
+tpValLbl.Position               = UDim2.new(0, 136, 0, 0)
+tpValLbl.BackgroundTransparency = 1
+tpValLbl.Text                   = "50"
+tpValLbl.TextColor3             = Color3.fromRGB(200, 200, 200)
+tpValLbl.TextSize               = 11
+tpValLbl.Font                   = Enum.Font.GothamBold
+tpValLbl.Parent                 = tpRow
+
+local tpResetBtn = Instance.new("TextButton")
+tpResetBtn.Size             = UDim2.new(0, 22, 0, 18)
+tpResetBtn.Position         = UDim2.new(1, -26, 0.5, -9)
+tpResetBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+tpResetBtn.BorderSizePixel  = 0
+tpResetBtn.Text             = "R"
+tpResetBtn.TextColor3       = Color3.fromRGB(255, 160, 60)
+tpResetBtn.TextSize         = 11
+tpResetBtn.Font             = Enum.Font.GothamBold
+tpResetBtn.Parent           = tpRow
+Instance.new("UICorner", tpResetBtn).CornerRadius = UDim.new(0, 4)
+tpResetBtn.MouseEnter:Connect(function() tpResetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100) end)
+tpResetBtn.MouseLeave:Connect(function() tpResetBtn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
+
+local function setTpSpeed(val)
+    val = math.clamp(math.floor(val + 0.5), 1, 400)
+    tpWalkSpeed = val
+    local t = (val - 1) / (400 - 1)
+    tpFill.Size      = UDim2.new(t, 0, 1, 0)
+    tpThumb.Position = UDim2.new(t, 0, 0.5, 0)
+    tpValLbl.Text    = tostring(val)
+end
+
+tpTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        slidingCallback = function(x)
+            local rel = (x - tpTrack.AbsolutePosition.X) / tpTrack.AbsoluteSize.X
+            setTpSpeed(1 + (400 - 1) * math.clamp(rel, 0, 1))
+        end
+        slidingCallback(input.Position.X)
+    end
+end)
+tpResetBtn.MouseButton1Click:Connect(function() setTpSpeed(50) end)
+
+local tpToggleBtn = Instance.new("TextButton")
+tpToggleBtn.Size                   = UDim2.new(0, 68, 1, 0)
+tpToggleBtn.BackgroundTransparency = 1
+tpToggleBtn.Text                   = ""
+tpToggleBtn.Parent                 = tpRow
+tpToggleBtn.MouseButton1Click:Connect(function()
+    tpWalkEnabled = not tpWalkEnabled
+    tpDot.BackgroundColor3 = tpWalkEnabled and Color3.fromRGB(50,168,82) or Color3.fromRGB(100,100,100)
+    tpLbl.TextColor3       = tpWalkEnabled and Color3.fromRGB(220,220,220) or Color3.fromRGB(160,160,160)
+    if tpWalkEnabled then startTpWalk() else stopTpWalk() end
+end)
+
+-- Stop tpwalk on character respawn
+player.CharacterAdded:Connect(function()
+    if tpWalkEnabled then
+        task.wait(1)
+        startTpWalk()
+    end
 end)
 makeSlider(262, "Jump pwr", 1, 1000, initialJumpPower, initialJumpPower, function(v)
     jumpPower = v
@@ -633,18 +782,32 @@ local function collectAll()
 
         local chest = spawnFolder:FindFirstChild("LBChest")
         if chest then
-            local prompt = findPrompt(chest)
-            if prompt then
+            local openPrompt = findPrompt(chest)
+            if openPrompt then
                 local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
                 local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
                 teleportTo(mainPart.CFrame) task.wait(0.05)
-                prompt.MaxActivationDistance = math.huge
-                fireproximityprompt(prompt) task.wait(0.5)
-                for _, item in ipairs(chest:GetDescendants()) do
-                    if item:IsA("ProximityPrompt") and item ~= prompt then
-                        item.MaxActivationDistance = math.huge
-                        fireproximityprompt(item) task.wait(0.2)
+                -- Fire the open prompt
+                openPrompt.MaxActivationDistance = math.huge
+                fireproximityprompt(openPrompt)
+                -- Wait for chest to open and potion prompts to appear (up to 3s)
+                local potionPrompts = {}
+                for _ = 1, 15 do
+                    task.wait(0.2)
+                    potionPrompts = {}
+                    for _, item in ipairs(chest:GetDescendants()) do
+                        if item:IsA("ProximityPrompt") and item ~= openPrompt then
+                            table.insert(potionPrompts, item)
+                        end
                     end
+                    if #potionPrompts >= 3 then break end
+                end
+                -- Collect each potion
+                for _, pp in ipairs(potionPrompts) do
+                    if not running or not active then break end
+                    pp.MaxActivationDistance = math.huge
+                    fireproximityprompt(pp)
+                    task.wait(COLLECT_DELAY)
                 end
                 task.wait(CHEST_DELAY)
             end
