@@ -424,7 +424,7 @@ end
 local initialWalkSpeed = walkSpeed
 local initialJumpPower = jumpPower
 
-makeSlider(202, "Fly spd",  1,   20,              1,               1, function(v) flySpeed = v end)
+makeSlider(202, "Fly spd",  1,  400,              1,               1, function(v) flySpeed = v end)
 makeSlider(232, "Walk spd", 1, 1000, initialWalkSpeed, initialWalkSpeed, function(v)
     walkSpeed = v
     local hum = getHumanoid()
@@ -565,7 +565,7 @@ task.spawn(function()
     end
 end)
 
--- ── Collector (no teleport — fireproximityprompt ignores distance) ─────────────
+-- ── Collector ─────────────────────────────────────────────────────────────────
 local function findPrompt(obj)
     if not obj then return nil end
     local p = obj:FindFirstChildOfClass("ProximityPrompt")
@@ -576,7 +576,22 @@ local function findPrompt(obj)
     return nil
 end
 
+local function teleportTo(cf)
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = cf + Vector3.new(0, 3, 0) end
+end
+
+local function getOriginCF()
+    local char = player.Character
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then return hrp.CFrame end
+end
+
 local function collectAll()
+    local origin = getOriginCF()
     for _, spawnFolder in ipairs(lbSearch:GetChildren()) do
         if not running or not active then return end
         if spawnFolder:IsA("Script") or spawnFolder:IsA("LocalScript") then continue end
@@ -585,9 +600,10 @@ local function collectAll()
         if lb then
             local prompt = findPrompt(lb)
             if prompt then
+                local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
+                teleportTo(part.CFrame) task.wait(0.05)
                 prompt.MaxActivationDistance = math.huge
-                fireproximityprompt(prompt)
-                task.wait(COLLECT_DELAY)
+                fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
             end
         end
 
@@ -595,11 +611,23 @@ local function collectAll()
                  or spawnFolder:FindFirstChild("XLbottleSpawn")
                  or spawnFolder:FindFirstChild("XLBottleSpawn")
         if xll then
-            local prompt = findPrompt(xll)
-            if prompt then
-                prompt.MaxActivationDistance = math.huge
-                fireproximityprompt(prompt)
-                task.wait(COLLECT_DELAY)
+            local part = xll:IsA("BasePart") and xll or xll:FindFirstChildWhichIsA("BasePart") or xll
+            if part then
+                teleportTo(part.CFrame)
+                -- Prompt may be added dynamically by server script - wait up to 1s for it
+                local prompt = nil
+                for _ = 1, 10 do
+                    task.wait(0.1)
+                    prompt = findPrompt(xll)
+                    if prompt then break end
+                end
+                if prompt then
+                    prompt.MaxActivationDistance = math.huge
+                    fireproximityprompt(prompt)
+                    task.wait(COLLECT_DELAY)
+                else
+                    task.wait(COLLECT_DELAY)
+                end
             end
         end
 
@@ -607,19 +635,24 @@ local function collectAll()
         if chest then
             local prompt = findPrompt(chest)
             if prompt then
+                local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
+                local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
+                teleportTo(mainPart.CFrame) task.wait(0.05)
                 prompt.MaxActivationDistance = math.huge
-                fireproximityprompt(prompt)
-                task.wait(0.5)
+                fireproximityprompt(prompt) task.wait(0.5)
                 for _, item in ipairs(chest:GetDescendants()) do
                     if item:IsA("ProximityPrompt") and item ~= prompt then
                         item.MaxActivationDistance = math.huge
-                        fireproximityprompt(item)
-                        task.wait(0.2)
+                        fireproximityprompt(item) task.wait(0.2)
                     end
                 end
                 task.wait(CHEST_DELAY)
             end
         end
+    end
+    -- Return to origin after collecting everything
+    if origin and running and active then
+        teleportTo(origin)
     end
 end
 
