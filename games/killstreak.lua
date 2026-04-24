@@ -108,7 +108,7 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 -- ── GUI ───────────────────────────────────────────────────────────────────────
-local W, H = 220, 385
+local W, H = 220, 465
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name           = "LBCollector"
@@ -787,32 +787,44 @@ local function collectAll()
         local chest = spawnFolder:FindFirstChild("LBChest")
         if chest then
             local openPrompt = findPrompt(chest)
-            if openPrompt and openPrompt.Enabled then  -- only act if chest is actually spawned
-                local main = chest:FindFirstChild("Main") or chest:FindFirstChildWhichIsA("BasePart") or chest
-                local mainPart = main:IsA("BasePart") and main or main:FindFirstChildWhichIsA("BasePart") or main
-                teleportTo(mainPart.CFrame) task.wait(0.05)
-                -- Fire the open prompt
+            if openPrompt and openPrompt.Enabled then
+                local main = chest:FindFirstChild("Main")
+                if main and not main:IsA("BasePart") then main = main:FindFirstChildWhichIsA("BasePart", true) end
+                if not main then main = chest:FindFirstChildWhichIsA("BasePart", true) end
+                if main then teleportTo(main.CFrame) task.wait(0.3) end
+                -- Open chest
                 openPrompt.MaxActivationDistance = math.huge
                 fireproximityprompt(openPrompt)
-                -- Wait for chest to open and potion prompts to appear (up to 3s)
-                local potionPrompts = {}
-                for _ = 1, 15 do
+                -- Wait for Potion1Pos/2Pos/3Pos to appear with LBbottleSpawn inside
+                local potionSlots = {}
+                for tries = 1, 20 do
                     task.wait(0.2)
-                    potionPrompts = {}
-                    for _, item in ipairs(chest:GetDescendants()) do
-                        if item:IsA("ProximityPrompt") and item ~= openPrompt then
-                            table.insert(potionPrompts, item)
+                    potionSlots = {}
+                    for i = 1, 3 do
+                        local slot = chest:FindFirstChild("Potion" .. i .. "Pos")
+                        if slot then
+                            local lb = slot:FindFirstChild("LBbottleSpawn")
+                            if lb then table.insert(potionSlots, lb) end
                         end
                     end
-                    if #potionPrompts >= 3 then break end
+                    if #potionSlots >= 3 then break end
                 end
-                -- Collect each potion
-                for _, pp in ipairs(potionPrompts) do
+                -- Teleport to each potion and collect
+                for _, lb in ipairs(potionSlots) do
                     if not running or not active then break end
-                    pp.MaxActivationDistance = math.huge
-                    fireproximityprompt(pp)
-                    task.wait(COLLECT_DELAY)
+                    local prompt = findPrompt(lb)
+                    if not prompt then
+                        -- Prompt might be on the parent slot
+                        prompt = findPrompt(lb.Parent)
+                    end
+                    if prompt then
+                        local part = lb:IsA("BasePart") and lb or lb:FindFirstChildWhichIsA("BasePart") or lb
+                        teleportTo(part.CFrame, 0) task.wait(0.2)
+                        prompt.MaxActivationDistance = math.huge
+                        fireproximityprompt(prompt) task.wait(COLLECT_DELAY)
+                    end
                 end
+                if origin then teleportTo(origin, 0) task.wait(0.2) end
                 task.wait(CHEST_DELAY)
             end
         end
@@ -1038,15 +1050,15 @@ Instance.new("UICorner", hbResetBtn).CornerRadius = UDim.new(0, 4)
 hbResetBtn.MouseEnter:Connect(function() hbResetBtn.BackgroundColor3 = Color3.fromRGB(100,100,100) end)
 hbResetBtn.MouseLeave:Connect(function() hbResetBtn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
 
-local HB_MIN, HB_MAX = 0.5, 10.0
+local HB_MIN, HB_MAX = 5, 500  -- in studs
 
 local function setHbValue(val)
-    val = math.clamp(math.floor(val * 10 + 0.5) / 10, HB_MIN, HB_MAX)
+    val = math.clamp(math.floor(val + 0.5), HB_MIN, HB_MAX)
     hitboxSize = val
     local t = (val - HB_MIN) / (HB_MAX - HB_MIN)
     hbFill.Size      = UDim2.new(t, 0, 1, 0)
     hbThumb.Position = UDim2.new(t, 0, 0.5, 0)
-    hbValLbl.Text    = val .. "x"
+    hbValLbl.Text    = tostring(val)
 end
 
 hbTrack.InputBegan:Connect(function(input)
@@ -1061,11 +1073,14 @@ end)
 hbResetBtn.MouseButton1Click:Connect(function() setHbValue(1.0) end)
 setHbValue(1.0)
 
+local boxPart = nil  -- the reach box attached to the tool
+
 local function restoreHitbox()
+    -- Remove the reach box
+    if boxPart then pcall(function() boxPart:Destroy() end) boxPart = nil end
+    -- Restore any expanded handle sizes
     for part, origSize in pairs(hitboxOrigSizes) do
-        pcall(function()
-            if part and part.Parent then part.Size = origSize end
-        end)
+        pcall(function() if part and part.Parent then part.Size = origSize end end)
     end
     hitboxOrigSizes = {}
 end
@@ -1076,17 +1091,12 @@ local function applyHitbox()
     local src = (char and char:FindFirstChild(selectedTool.Name))
              or player.Backpack:FindFirstChild(selectedTool.Name)
     if not src then return end
-    for _, part in ipairs(src:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if not hitboxOrigSizes[part] then hitboxOrigSizes[part] = part.Size end
-            part.Size = hitboxOrigSizes[part] * hitboxSize
-        end
-    end
     local handle = src:FindFirstChild("Handle")
-    if handle and handle:IsA("BasePart") then
-        if not hitboxOrigSizes[handle] then hitboxOrigSizes[handle] = handle.Size end
-        handle.Size = hitboxOrigSizes[handle] * hitboxSize
-    end
+    if not handle or not handle:IsA("BasePart") then return end
+    -- Store original size
+    if not hitboxOrigSizes[handle] then hitboxOrigSizes[handle] = handle.Size end
+    -- IY-style boxreach: set handle Size to the stud value
+    handle.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
 end
 
 local hbToggleBtn = Instance.new("TextButton")
@@ -1103,10 +1113,209 @@ end)
 
 task.spawn(function()
     while active do
-        if hitboxEnabled then applyHitbox() end
-        task.wait(0.1)
+        if hitboxEnabled then
+            applyHitbox()
+            task.wait(3)
+            if hitboxEnabled and active then
+                -- Pulse: briefly restore then reapply to retrigger Touched
+                -- for NPCs that respawned inside the hitbox zone
+                restoreHitbox()
+                task.wait(0.05)
+                applyHitbox()
+            end
+        else
+            task.wait(0.1)
+        end
     end
     restoreHitbox()
+end)
+
+-- ── Farming ───────────────────────────────────────────────────────────────────
+local NPC_TYPES = {
+    { label = "Sword Noobs",         folder = "Noobs",                model = "Sword Noob"            },
+    { label = "Crossbow Noobs",      folder = "CrossbowNoobs",        model = "Crossbow Noob"         },
+    { label = "Spectrals",           folder = "Spectrals",            model = "Spectral"              },
+    { label = "Light Demons",        folder = "LightDemons",          model = "Light Demon"           },
+    { label = "Darkness Demons",     folder = "DarknessDemonds",      model = "Darkness Demon"        },
+    { label = "Demon Masters",       folder = "DarknessDemonMasters", model = "Darkness Demon Master" },
+    { label = "God Creatures",       folder = "GodCreatures",         model = "God Creature"          },
+    { label = "Heavenly Guardians",  folder = "HeavenlyGuardians",    model = "Heavenly Guardian"     },
+}
+
+local selectedNpcType = nil
+local farmActive      = false
+
+-- Farming GUI
+local div3 = Instance.new("Frame")
+div3.Size             = UDim2.new(1, -12, 0, 1)
+div3.Position         = UDim2.new(0, 6, 0, 378)
+div3.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+div3.BorderSizePixel  = 0
+div3.Parent           = frame
+trackContent(div3)
+
+local farmSecLbl = Instance.new("TextLabel")
+farmSecLbl.Size                   = UDim2.new(1, -12, 0, 14)
+farmSecLbl.Position               = UDim2.new(0, 6, 0, 382)
+farmSecLbl.BackgroundTransparency = 1
+farmSecLbl.Text                   = "FARMING"
+farmSecLbl.TextColor3             = Color3.fromRGB(90, 90, 90)
+farmSecLbl.TextSize               = 10
+farmSecLbl.Font                   = Enum.Font.GothamBold
+farmSecLbl.TextXAlignment         = Enum.TextXAlignment.Left
+farmSecLbl.Parent                 = frame
+trackContent(farmSecLbl)
+
+-- NPC type dropdown
+local npcDropRow = Instance.new("Frame")
+npcDropRow.Size             = UDim2.new(1, -12, 0, 26)
+npcDropRow.Position         = UDim2.new(0, 6, 0, 400)
+npcDropRow.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+npcDropRow.BorderSizePixel  = 0
+npcDropRow.Parent           = frame
+Instance.new("UICorner", npcDropRow).CornerRadius = UDim.new(0, 6)
+trackContent(npcDropRow)
+
+local npcDropBtn = Instance.new("TextButton")
+npcDropBtn.Size                   = UDim2.new(1, 0, 1, 0)
+npcDropBtn.BackgroundTransparency = 1
+npcDropBtn.Text                   = "Select NPC  v"
+npcDropBtn.TextColor3             = Color3.fromRGB(160, 160, 160)
+npcDropBtn.TextSize               = 11
+npcDropBtn.Font                   = Enum.Font.Gotham
+npcDropBtn.Parent                 = npcDropRow
+
+local npcDropList = Instance.new("Frame")
+npcDropList.Size             = UDim2.new(1, -12, 0, 0)
+npcDropList.Position         = UDim2.new(0, 6, 0, 400)
+npcDropList.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+npcDropList.BorderSizePixel  = 0
+npcDropList.ZIndex           = 20
+npcDropList.Visible          = false
+npcDropList.ClipsDescendants = true
+npcDropList.Parent           = frame
+Instance.new("UICorner", npcDropList).CornerRadius = UDim.new(0, 6)
+
+local npcDropScroll = Instance.new("ScrollingFrame")
+npcDropScroll.Size                   = UDim2.new(1, 0, 1, 0)
+npcDropScroll.BackgroundTransparency = 1
+npcDropScroll.BorderSizePixel        = 0
+npcDropScroll.ScrollBarThickness     = 4
+npcDropScroll.ZIndex                 = 20
+npcDropScroll.Parent                 = npcDropList
+local npcLayout = Instance.new("UIListLayout")
+npcLayout.Padding   = UDim.new(0, 2)
+npcLayout.SortOrder = Enum.SortOrder.LayoutOrder
+npcLayout.Parent    = npcDropScroll
+local npcPad = Instance.new("UIPadding")
+npcPad.PaddingLeft = UDim.new(0, 4)
+npcPad.Parent      = npcDropScroll
+
+local function refreshNpcDropdown()
+    for _, ch in ipairs(npcDropScroll:GetChildren()) do
+        if ch:IsA("TextButton") then ch:Destroy() end
+    end
+    for _, npcType in ipairs(NPC_TYPES) do
+        -- Only show if folder exists in workspace
+        local folder = workspace:FindFirstChild(npcType.folder)
+        if not folder then continue end
+        local entry = Instance.new("TextButton")
+        entry.Size             = UDim2.new(1, -4, 0, 24)
+        entry.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        entry.BorderSizePixel  = 0
+        entry.Text             = npcType.label
+        entry.TextColor3       = Color3.fromRGB(200, 200, 200)
+        entry.TextSize         = 11
+        entry.Font             = Enum.Font.Gotham
+        entry.ZIndex           = 20
+        entry.Parent           = npcDropScroll
+        Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 4)
+        entry.MouseEnter:Connect(function() entry.BackgroundColor3 = Color3.fromRGB(60,60,60) end)
+        entry.MouseLeave:Connect(function() entry.BackgroundColor3 = Color3.fromRGB(45,45,45) end)
+        entry.MouseButton1Click:Connect(function()
+            selectedNpcType     = npcType
+            npcDropBtn.Text     = npcType.label .. "  v"
+            npcDropList.Visible = false
+        end)
+    end
+    local items = npcDropScroll:GetChildren()
+    local count = 0
+    for _, c in ipairs(items) do if c:IsA("TextButton") then count += 1 end end
+    count = math.max(1, count)
+    local listH = math.min(count * 26, 130)
+    npcDropList.Position     = UDim2.new(0, 6, 0, 400 - listH - 2)
+    npcDropList.Size         = UDim2.new(1, -12, 0, listH)
+    npcDropScroll.CanvasSize = UDim2.new(0, 0, 0, count * 26)
+end
+
+npcDropBtn.MouseButton1Click:Connect(function()
+    if npcDropList.Visible then
+        npcDropList.Visible = false
+    else
+        refreshNpcDropdown()
+        npcDropList.Visible = true
+    end
+end)
+
+-- Farm start/stop button
+local farmBtn = Instance.new("TextButton")
+farmBtn.Size             = UDim2.new(1, -12, 0, 26)
+farmBtn.Position         = UDim2.new(0, 6, 0, 430)
+farmBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
+farmBtn.BorderSizePixel  = 0
+farmBtn.Text             = "Start Farming"
+farmBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+farmBtn.TextSize         = 13
+farmBtn.Font             = Enum.Font.GothamBold
+farmBtn.Parent           = frame
+Instance.new("UICorner", farmBtn).CornerRadius = UDim.new(0, 6)
+trackContent(farmBtn)
+
+farmBtn.MouseButton1Click:Connect(function()
+    if not selectedNpcType then return end
+    farmActive = not farmActive
+    if farmActive then
+        farmBtn.Text             = "Stop Farming"
+        farmBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+    else
+        farmBtn.Text             = "Start Farming"
+        farmBtn.BackgroundColor3 = Color3.fromRGB(50, 168, 82)
+    end
+end)
+
+-- Farming loop: teleport above spawn area and stay there
+task.spawn(function()
+    while active do
+        if farmActive and selectedNpcType then
+            local folder = workspace:FindFirstChild(selectedNpcType.folder)
+            if folder then
+                -- Get average position of all NPCs in folder
+                local sum = Vector3.zero
+                local count = 0
+                for _, obj in ipairs(folder:GetDescendants()) do
+                    if obj:IsA("Model") then
+                        local hrp = obj:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            sum   += hrp.Position
+                            count += 1
+                        end
+                    end
+                end
+                if count > 0 then
+                    local center = sum / count
+                    -- Teleport 60 studs above the center of the spawn area
+                    local char = player.Character
+                    if char then
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.CFrame = CFrame.new(center + Vector3.new(0, 60, 0))
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
 end)
 -- ── Main loop ─────────────────────────────────────────────────────────────────
 while active do
