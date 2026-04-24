@@ -1076,9 +1076,7 @@ setHbValue(1.0)
 local boxPart = nil  -- the reach box attached to the tool
 
 local function restoreHitbox()
-    -- Remove the reach box
     if boxPart then pcall(function() boxPart:Destroy() end) boxPart = nil end
-    -- Restore any expanded handle sizes
     for part, origSize in pairs(hitboxOrigSizes) do
         pcall(function() if part and part.Parent then part.Size = origSize end end)
     end
@@ -1104,11 +1102,36 @@ hbToggleBtn.Size                   = UDim2.new(0, 64, 1, 0)
 hbToggleBtn.BackgroundTransparency = 1
 hbToggleBtn.Text                   = ""
 hbToggleBtn.Parent                 = hbRow
+local hbSelBox = nil
+
+local function updateHbVisual()
+    if hbSelBox then pcall(function() hbSelBox:Destroy() end) hbSelBox = nil end
+    if not hitboxEnabled or not selectedTool then return end
+    local char = player.Character
+    local src = (char and char:FindFirstChild(selectedTool.Name))
+             or player.Backpack:FindFirstChild(selectedTool.Name)
+    if not src then return end
+    local handle = src:FindFirstChild("Handle")
+    if not handle or not handle:IsA("BasePart") then return end
+    hbSelBox = Instance.new("SelectionBox")
+    hbSelBox.Adornee         = handle
+    hbSelBox.Color3          = Color3.fromRGB(255, 80, 80)
+    hbSelBox.LineThickness   = 0.1
+    hbSelBox.SurfaceColor3   = Color3.fromRGB(255, 80, 80)
+    hbSelBox.SurfaceTransparency = 0.7
+    hbSelBox.Parent          = workspace
+end
+
 hbToggleBtn.MouseButton1Click:Connect(function()
     hitboxEnabled = not hitboxEnabled
     hbDot.BackgroundColor3 = hitboxEnabled and Color3.fromRGB(50,168,82) or Color3.fromRGB(100,100,100)
     hbLbl.TextColor3       = hitboxEnabled and Color3.fromRGB(220,220,220) or Color3.fromRGB(160,160,160)
-    if not hitboxEnabled then restoreHitbox() end
+    if hitboxEnabled then
+        updateHbVisual()
+    else
+        restoreHitbox()
+        if hbSelBox then pcall(function() hbSelBox:Destroy() end) hbSelBox = nil end
+    end
 end)
 
 task.spawn(function()
@@ -1217,7 +1240,8 @@ local function refreshNpcDropdown()
     end
     for _, npcType in ipairs(NPC_TYPES) do
         -- Only show if folder exists in workspace
-        local folder = workspace:FindFirstChild(npcType.folder)
+        local npcRoot = workspace:FindFirstChild("NPC")
+            local folder = npcRoot and npcRoot:FindFirstChild(npcType.folder)
         if not folder then continue end
         local entry = Instance.new("TextButton")
         entry.Size             = UDim2.new(1, -4, 0, 24)
@@ -1287,7 +1311,8 @@ end)
 task.spawn(function()
     while active do
         if farmActive and selectedNpcType then
-            local folder = workspace:FindFirstChild(selectedNpcType.folder)
+            local npcRoot2 = workspace:FindFirstChild("NPC")
+            local folder = npcRoot2 and npcRoot2:FindFirstChild(selectedNpcType.folder)
             if folder then
                 -- Get average position of all NPCs in folder
                 local sum = Vector3.zero
