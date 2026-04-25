@@ -769,7 +769,8 @@ local function collectAll()
             end
         end
 
-        local xll = spawnFolder:FindFirstChild("XLLbottleSpawn")
+        local xll = spawnFolder:FindFirstChild("XLLBbottleSpawn")
+                 or spawnFolder:FindFirstChild("XLLbottleSpawn")
                  or spawnFolder:FindFirstChild("XLbottleSpawn")
                  or spawnFolder:FindFirstChild("XLBottleSpawn")
         if xll then
