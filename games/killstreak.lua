@@ -690,9 +690,19 @@ task.spawn(function()
                 if getEspEnabled() then addEsp(lbPart, "LB Bottle", Color3.fromRGB(100,180,255))
                 else removeEsp(lbPart) end
             end
-            local xlPart = findBottlePart(spawnFolder, "XLLbottleSpawn")
-                        or findBottlePart(spawnFolder, "XLbottleSpawn")
-                        or findBottlePart(spawnFolder, "XLBottleSpawn")
+            -- XLL bottle: model contains Bottle > BaseParts, find any BasePart inside
+            local xllModel = spawnFolder:FindFirstChild("XLLBbottleSpawn")
+                          or spawnFolder:FindFirstChild("XLLbottleSpawn")
+                          or spawnFolder:FindFirstChild("XLbottleSpawn")
+                          or spawnFolder:FindFirstChild("XLBottleSpawn")
+            local xlPart = nil
+            if xllModel then
+                if xllModel:IsA("BasePart") then
+                    xlPart = xllModel
+                else
+                    xlPart = xllModel:FindFirstChildWhichIsA("BasePart", true)
+                end
+            end
             if xlPart then
                 if getEspEnabled() then addEsp(xlPart, "XL Bottle", Color3.fromRGB(100,255,150))
                 else removeEsp(xlPart) end
@@ -1307,40 +1317,67 @@ farmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Farming loop: teleport above spawn area and stay there
+local farmBodyPos  = nil
+local farmBodyGyro = nil
+
+local function stopFarmLock()
+    if farmBodyPos  then pcall(function() farmBodyPos:Destroy()  end) farmBodyPos  = nil end
+    if farmBodyGyro then pcall(function() farmBodyGyro:Destroy() end) farmBodyGyro = nil end
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
+end
+
 task.spawn(function()
     while active do
         if farmActive and selectedNpcType then
             local npcRoot2 = workspace:FindFirstChild("NPC")
             local folder = npcRoot2 and npcRoot2:FindFirstChild(selectedNpcType.folder)
             if folder then
-                -- Get average position of all NPCs in folder
                 local sum = Vector3.zero
                 local count = 0
                 for _, obj in ipairs(folder:GetDescendants()) do
                     if obj:IsA("Model") then
                         local hrp = obj:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            sum   += hrp.Position
-                            count += 1
-                        end
+                        if hrp then sum += hrp.Position count += 1 end
                     end
                 end
                 if count > 0 then
-                    local center = sum / count
-                    -- Teleport 60 studs above the center of the spawn area
+                    local targetPos = sum / count + Vector3.new(0, 60, 0)
                     local char = player.Character
                     if char then
                         local hrp = char:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            hrp.CFrame = CFrame.new(center + Vector3.new(0, 60, 0))
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        if hrp and hum then
+                            hrp.CFrame = CFrame.new(targetPos)
+                            hum.PlatformStand = true
+                            if not farmBodyPos or not farmBodyPos.Parent then
+                                farmBodyPos          = Instance.new("BodyPosition")
+                                farmBodyPos.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                                farmBodyPos.P        = 1e4
+                                farmBodyPos.D        = 1e3
+                                farmBodyPos.Parent   = hrp
+                            end
+                            farmBodyPos.Position = targetPos
+                            if not farmBodyGyro or not farmBodyGyro.Parent then
+                                farmBodyGyro           = Instance.new("BodyGyro")
+                                farmBodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+                                farmBodyGyro.P         = 1e4
+                                farmBodyGyro.CFrame    = hrp.CFrame
+                                farmBodyGyro.Parent    = hrp
+                            end
                         end
                     end
                 end
             end
+        else
+            stopFarmLock()
         end
         task.wait(1)
     end
+    stopFarmLock()
 end)
 -- ── Main loop ─────────────────────────────────────────────────────────────────
 while active do
