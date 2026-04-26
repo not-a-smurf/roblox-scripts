@@ -1331,6 +1331,46 @@ local function stopFarmLock()
     end
 end
 
+-- Make NPCs semi-transparent and camera-passthrough while farming
+local npcTransparencyApplied = {}
+
+local function applyNpcTransparency(folder)
+    if not folder then return end
+    for _, obj in ipairs(folder:GetDescendants()) do
+        if obj:IsA("BasePart") and not npcTransparencyApplied[obj] then
+            npcTransparencyApplied[obj] = obj.LocalTransparencyModifier
+            obj.LocalTransparencyModifier = 0.7  -- semi-transparent on client only
+            obj.CanQuery = false                  -- camera passes through
+        end
+    end
+end
+
+local function restoreNpcTransparency()
+    for part, origVal in pairs(npcTransparencyApplied) do
+        pcall(function()
+            if part and part.Parent then
+                part.LocalTransparencyModifier = origVal
+                part.CanQuery = true
+            end
+        end)
+    end
+    npcTransparencyApplied = {}
+end
+
+task.spawn(function()
+    while active do
+        if farmActive and selectedNpcType then
+            local npcRoot2 = workspace:FindFirstChild("NPC")
+            local folder = npcRoot2 and npcRoot2:FindFirstChild(selectedNpcType.folder)
+            applyNpcTransparency(folder)
+        else
+            restoreNpcTransparency()
+        end
+        task.wait(1)
+    end
+    restoreNpcTransparency()
+end)
+
 task.spawn(function()
     while active do
         if farmActive and selectedNpcType then
